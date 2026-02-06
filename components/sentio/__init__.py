@@ -4,9 +4,11 @@ from esphome import automation
 from esphome.components import touchscreen
 from esphome.const import CONF_ID, CONF_SOURCE, CONF_OUTPUT_ID
 
-# Namespace
-Sentio_ns = cg.esphome_ns.namespace('sentio')
-SmartTouchComponent = Sentio_ns.class_('SmartTouchComponent', touchscreen.Touchscreen, cg.Component)
+# Namespace - Use global namespace sentio
+# Note: external components are loaded into 'esphome.components.<name>' by the loader dynamically,
+# but we shouldn't rely on relative imports for the base class if it's confusing the loader.
+sentio_ns = cg.esphome_ns.namespace('sentio')
+SmartTouchComponent = sentio_ns.class_('SmartTouchComponent', touchscreen.Touchscreen, cg.Component)
 
 # Configuration Constants
 CONF_DISPLAY_WIDTH = "display_width"
