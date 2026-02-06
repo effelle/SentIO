@@ -1,0 +1,12 @@
+{
+  "name": "SentIO",
+  "version": "1.0.0",
+  "description": "Universal Input Subsystem for ESPHome",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/effelle/SentIO.git"
+  },
+  "keywords": ["esphome", "touchscreen", "display", "input", "lvgl"],
+  "frameworks": ["espidf", "arduino"],
+  "platforms": ["espressif32"]
+}

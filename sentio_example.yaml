@@ -1,0 +1,64 @@
+esphome:
+  name: sentio-test
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+external_components:
+  - source: components
+
+logger:
+
+spi:
+  clk_pin: GPIO18
+  mosi_pin: GPIO23
+  miso_pin: GPIO19
+
+i2c:
+  sda: GPIO21
+  scl: GPIO22
+
+display:
+  - platform: ili9341
+    model: TFT_2.4
+    id: my_display
+    cs_pin: GPIO5
+    dc_pin: GPIO2
+    lambda: |-
+      // Visual Debug: Red Dot at touch position
+      for (auto t : id(my_sentio)->touches) {
+         it.filled_circle(t.x, t.y, 5, Color(255, 0, 0));
+      }
+
+touchscreen:
+  - platform: gt911
+    id: raw_touch
+    internal: true
+    i2c_id: i2c
+    interrupt_pin: GPIO4
+    
+  - platform: Sentio
+    id: my_sentio
+    source: raw_touch
+    display_width: 320
+    display_height: 240
+    # Test all params
+    sleep_timeout: 10s
+    suppress_wake_click: true
+    swap_xy: true
+    invert_x: true
+    invert_y: false
+    debounce_threshold: 10ms
+    debug_raw_touch: true
+    on_swipe_left:
+      - logger.log: "Left"
+    on_swipe_right:
+      - logger.log: "Right"
+    on_tap:
+      - logger.log: "Tap"
+    on_wake:
+      - logger.log: "Wake"
+    on_sleep:
+      - logger.log: "Sleep"
