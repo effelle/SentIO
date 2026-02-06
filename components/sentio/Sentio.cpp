@@ -1,7 +1,7 @@
 #include "Sentio.h"
 
 namespace esphome {
-namespace Sentio {
+namespace sentio {
 
 static const int SWIPE_THRESHOLD = 30; // Pixels to trigger a swipe
 static const int MAX_TAP_TIME = 400; // Max ms for a tap (otherwise it's a hold)
@@ -181,5 +181,5 @@ Trigger<> *SmartTouchComponent::get_trigger(const std::string &conf) {
   return nullptr;
 }
 
-} // namespace Sentio
+} // namespace sentio
 } // namespace esphome

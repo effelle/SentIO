@@ -39,7 +39,7 @@ touchscreen:
     i2c_id: i2c
     interrupt_pin: GPIO4
     
-  - platform: Sentio
+  - platform: sentio
     id: my_sentio
     source: raw_touch
     display_width: 320
