@@ -1,4 +1,0 @@
-esp8266:
-  restore_from_flash: true
-
-<<: !include common.yaml

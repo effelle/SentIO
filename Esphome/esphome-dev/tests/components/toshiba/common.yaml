@@ -1,4 +1,0 @@
-climate:
-  - platform: toshiba
-    name: Toshiba Climate
-    transmitter_id: xmitr

@@ -1,3 +1,0 @@
-sensor:
-  - platform: wts01
-    id: wts01_sensor

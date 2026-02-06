@@ -1,5 +1,0 @@
-sensor:
-  - platform: sen21231
-    i2c_id: i2c_bus
-    id: sen21231_sensor1
-    name: Person Sensor

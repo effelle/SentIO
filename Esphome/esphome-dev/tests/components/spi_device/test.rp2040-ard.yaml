@@ -1,4 +1,0 @@
-packages:
-  spi: !include ../../test_build_components/common/spi/rp2040-ard.yaml
-
-<<: !include common.yaml

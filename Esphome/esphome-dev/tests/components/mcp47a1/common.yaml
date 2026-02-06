@@ -1,4 +1,0 @@
-output:
-  - platform: mcp47a1
-    id: output_mcp47a1
-    i2c_id: i2c_bus

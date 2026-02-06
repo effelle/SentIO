@@ -1,3 +1,0 @@
-<<: !include common-esp32.yaml
-
-http_request:

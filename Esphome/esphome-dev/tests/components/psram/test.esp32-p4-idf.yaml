@@ -1,9 +1,0 @@
-esp32:
-  cpu_frequency: 360MHz
-  framework:
-    type: esp-idf
-    advanced:
-      enable_idf_experimental_features: yes
-
-psram:
-  speed: 200MHz

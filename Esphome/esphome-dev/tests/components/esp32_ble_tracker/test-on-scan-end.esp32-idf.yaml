@@ -1,3 +1,0 @@
-esp32_ble_tracker:
-  on_scan_end:
-    - logger.log: "Scan ended!"

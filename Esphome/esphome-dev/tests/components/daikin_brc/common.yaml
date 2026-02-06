@@ -1,4 +1,0 @@
-climate:
-  - platform: daikin_brc
-    name: Daikin_brc Climate
-    transmitter_id: xmitr

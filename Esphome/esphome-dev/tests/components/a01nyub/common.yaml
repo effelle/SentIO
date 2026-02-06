@@ -1,4 +1,0 @@
-sensor:
-  - platform: a01nyub
-    id: a01nyub_sensor
-    name: a01nyub Distance

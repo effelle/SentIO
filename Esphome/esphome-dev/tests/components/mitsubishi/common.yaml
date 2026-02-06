@@ -1,4 +1,0 @@
-climate:
-  - platform: mitsubishi
-    name: Mitsubishi
-    transmitter_id: xmitr

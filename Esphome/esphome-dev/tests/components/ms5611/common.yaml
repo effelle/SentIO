@@ -1,9 +1,0 @@
-sensor:
-  - platform: ms5611
-    i2c_id: i2c_bus
-    temperature:
-      name: Outside Temperature
-    pressure:
-      name: Outside Pressure
-    address: 0x77
-    update_interval: 15s

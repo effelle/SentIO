@@ -1,7 +1,0 @@
-substitutions:
-  enable_rx_pin: GPIO15
-
-packages:
-  uart_1200_none_2stopbits: !include ../../test_build_components/common/uart_1200_none_2stopbits/esp8266-ard.yaml
-
-<<: !include common.yaml

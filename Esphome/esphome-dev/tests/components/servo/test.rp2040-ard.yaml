@@ -1,5 +1,0 @@
-substitutions:
-  output_platform: rp2040_pwm
-  pin: GPIO4
-
-<<: !include common.yaml

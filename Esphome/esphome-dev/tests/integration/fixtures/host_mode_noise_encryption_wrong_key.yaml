@@ -1,7 +1,0 @@
-esphome:
-  name: host-noise-test
-host:
-api:
-  encryption:
-    key: N4Yle5YirwZhPiHHsdZLdOA73ndj/84veVaLhTvxCuU=
-logger:

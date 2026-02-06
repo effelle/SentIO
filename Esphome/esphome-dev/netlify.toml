@@ -1,4 +1,0 @@
-[build]
-  command = "script/build-api-docs"
-  publish = "api-docs"
-  environment = { PYTHON_VERSION = "3.13" }

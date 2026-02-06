@@ -1,4 +1,0 @@
-binary_sensor:
-  - platform: qwiic_pir
-    i2c_id: i2c_bus
-    name: Qwiic PIR Motion Sensor

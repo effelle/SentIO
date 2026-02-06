@@ -1,8 +1,0 @@
-wifi:
-  ssid: MySSID
-  password: password1
-
-text_sensor:
-  - platform: wifi_info
-    mac_address:
-      name: MAC Address

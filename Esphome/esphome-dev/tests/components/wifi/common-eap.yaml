@@ -1,8 +1,0 @@
-wifi:
-  fast_connect: true
-  networks:
-    - ssid: MySSID
-      eap:
-        username: username
-        password: password
-        identity: identity

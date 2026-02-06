@@ -1,4 +1,0 @@
-# acts as a proxy to be able to include a remote package
-# in which the shorthand comes from a substitution
-packages:
-  - github://esphome/${repo}/${file}@${ref}

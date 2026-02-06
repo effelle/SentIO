@@ -1,7 +1,0 @@
-network:
-
-wifi:
-  ssid: MySSID
-  password: password1
-
-api:

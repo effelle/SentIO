@@ -1,5 +1,0 @@
-substitutions:
-  clock_pin: GPIO0
-  data_pin: GPIO2
-
-<<: !include common.yaml

@@ -1,4 +1,0 @@
-sensor:
-  - platform: tmp102
-    i2c_id: i2c_bus
-    name: TMP102 Temperature

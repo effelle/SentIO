@@ -1,4 +1,0 @@
-text_sensor:
-  - platform: wl_134
-    name: Transponder Code
-    reset: true

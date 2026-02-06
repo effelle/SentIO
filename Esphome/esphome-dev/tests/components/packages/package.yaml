@@ -1,3 +1,0 @@
-sensor:
-  - platform: template
-    id: package_sensor

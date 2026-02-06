@@ -1,4 +1,0 @@
-climate:
-  - platform: coolix
-    name: Coolix Climate
-    transmitter_id: xmitr
