@@ -1,0 +1,6 @@
+{
+    "name": "SentIO",
+    "components": [
+        "components/sentio"
+    ]
+}
