@@ -384,7 +384,9 @@ lv_obj_t *SentioComponent::create_widget(const std::string &type, lv_obj_t *pare
 #if LV_USE_SWITCH
   if (type == "switch" || type == "sw")     return lv_switch_create(parent);
 #endif
+#if LV_USE_CHECKBOX
   if (type == "checkbox" || type == "cb")   return lv_checkbox_create(parent);
+#endif
 #if LV_USE_DROPDOWN
   if (type == "dropdown" || type == "dd")   return lv_dropdown_create(parent);
 #endif
@@ -436,8 +438,10 @@ void SentioComponent::apply_properties(lv_obj_t *obj, JsonObject props) {
     const char *text = props["text"].as<const char *>();
     if (lv_obj_check_type(obj, &lv_label_class)) {
       lv_label_set_text(obj, text);
+#if LV_USE_CHECKBOX
     } else if (lv_obj_check_type(obj, &lv_checkbox_class)) {
       lv_checkbox_set_text(obj, text);
+#endif
     } else if (lv_obj_check_type(obj, &lv_button_class)) {
       // Auto-create a child label on the button if text is provided
       lv_obj_t *existing_label = lv_obj_get_child(obj, 0);
@@ -714,8 +718,10 @@ void SentioComponent::bind_sensor(const std::string &widget_id, const std::strin
       
       if (lv_obj_check_type(obj, &lv_label_class)) {
         lv_label_set_text(obj, buf);
+#if LV_USE_CHECKBOX
       } else if (lv_obj_check_type(obj, &lv_checkbox_class)) {
         lv_checkbox_set_text(obj, buf);
+#endif
       } else if (lv_obj_check_type(obj, &lv_button_class)) {
         lv_obj_t *existing_label = lv_obj_get_child(obj, 0);
         if (existing_label == nullptr || !lv_obj_check_type(existing_label, &lv_label_class)) {
@@ -738,8 +744,10 @@ void SentioComponent::bind_sensor(const std::string &widget_id, const std::strin
       
       if (lv_obj_check_type(obj, &lv_label_class)) {
         lv_label_set_text(obj, buf);
+#if LV_USE_CHECKBOX
       } else if (lv_obj_check_type(obj, &lv_checkbox_class)) {
         lv_checkbox_set_text(obj, buf);
+#endif
       } else if (lv_obj_check_type(obj, &lv_button_class)) {
         lv_obj_t *existing_label = lv_obj_get_child(obj, 0);
         if (existing_label == nullptr || !lv_obj_check_type(existing_label, &lv_label_class)) {
