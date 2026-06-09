@@ -13,8 +13,14 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome import automation
 from esphome.components import light, output, touchscreen
-from esphome.components.lvgl.helpers import add_lv_use
 from esphome.const import CONF_ID, CONF_TRIGGER_ID
+
+# add_lv_use was introduced in a later ESPHome release; fall back gracefully
+try:
+    from esphome.components.lvgl.helpers import add_lv_use
+except ImportError:
+    def add_lv_use(*_args):  # noqa: E306 — no-op for older ESPHome builds
+        pass
 
 CODEOWNERS = ["@effelle"]
 DEPENDENCIES = ["api", "lvgl"]
