@@ -95,9 +95,6 @@ void SentioComponent::setup() {
   lv_obj_clear_flag(root_container_, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_clear_flag(root_container_, LV_OBJ_FLAG_CLICKABLE);
 
-  // Register swipe gesture handler on the active screen
-  lv_obj_add_event_cb(lv_scr_act(), sentio_gesture_event_cb, LV_EVENT_GESTURE, this);
-
   // Register HA API services
   register_service(&SentioComponent::service_run_jsonl,
                    "sentio_run_jsonl", {"line"});
@@ -129,17 +126,63 @@ void SentioComponent::setup() {
 void SentioComponent::loop() {
   uint32_t now = millis();
 
-  // ── Track touch activity from upstream driver ────────────────────────────
-  if (touch_source_ != nullptr && !touch_source_->get_touches().empty()) {
-    if (is_sleeping_) {
-      // Touch while sleeping: wake up, optionally suppress this first event
-      wake_up();
-      if (suppress_wake_click_) {
-        ignore_wake_tap_ = true;
-        return; // Swallow this frame
+  // ── Track touch activity from upstream driver and detect gestures ─────────
+  if (touch_source_ != nullptr) {
+    auto touches = touch_source_->get_touches();
+    if (!touches.empty()) {
+      auto touch = touches.front();
+
+      if (is_sleeping_) {
+        // Touch while sleeping: wake up
+        wake_up();
+        if (suppress_wake_click_) {
+          ignore_wake_tap_ = true;
+          // Transition immediately to DRAGGING to suppress any gesture triggers on wake-up touch
+          touch_state_ = TouchState::DRAGGING;
+          return;
+        }
       }
+
+      last_activity_ms_ = now;
+
+      // Gesture State Machine
+      if (touch_state_ == TouchState::IDLE) {
+        touch_state_ = TouchState::START;
+        touch_start_x_ = touch.x;
+        touch_start_y_ = touch.y;
+        touch_start_ms_ = now;
+      } else if (touch_state_ == TouchState::START) {
+        int16_t dx = touch.x - touch_start_x_;
+        int16_t dy = touch.y - touch_start_y_;
+
+        // Use 80 pixels threshold (25% of 320px screen width) for reliable swipes
+        const int16_t threshold = 80;
+
+        if (std::abs(dx) >= threshold || std::abs(dy) >= threshold) {
+          touch_state_ = TouchState::DRAGGING;
+
+          if (std::abs(dx) >= std::abs(dy)) {
+            // Horizontal swipe
+            if (dx > 0) {
+              handle_gesture(LV_DIR_RIGHT);
+            } else {
+              handle_gesture(LV_DIR_LEFT);
+            }
+          } else {
+            // Vertical swipe
+            if (dy > 0) {
+              handle_gesture(LV_DIR_BOTTOM);
+            } else {
+              handle_gesture(LV_DIR_TOP);
+            }
+          }
+        }
+      }
+    } else {
+      // Finger released
+      touch_state_ = TouchState::IDLE;
+      ignore_wake_tap_ = false;
     }
-    last_activity_ms_ = now;
   }
 
   // ── Sleep timeout ────────────────────────────────────────────────────────
