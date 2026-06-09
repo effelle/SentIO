@@ -345,7 +345,17 @@ void SentioComponent::parse_jsonl_line(const std::string &line) {
         lv_obj_del(it->second);
         widgets_.erase(it);
       }
-      obj = create_widget(type, root_container_);
+      lv_obj_t *parent_obj = root_container_;
+      if (root["parent"].is<const char *>()) {
+        std::string parent_id = root["parent"].as<std::string>();
+        auto pit = widgets_.find(parent_id);
+        if (pit != widgets_.end()) {
+          parent_obj = pit->second;
+        } else {
+          ESP_LOGW(TAG, "Parent widget '%s' not found, defaulting to root", parent_id.c_str());
+        }
+      }
+      obj = create_widget(type, parent_obj);
       if (obj == nullptr) {
         ESP_LOGW(TAG, "Unknown widget type '%s'", type.c_str());
         return false;
@@ -361,6 +371,15 @@ void SentioComponent::parse_jsonl_line(const std::string &line) {
         return false;
       }
       obj = it->second;
+      if (root["parent"].is<const char *>()) {
+        std::string parent_id = root["parent"].as<std::string>();
+        auto pit = widgets_.find(parent_id);
+        if (pit != widgets_.end()) {
+          lv_obj_set_parent(obj, pit->second);
+        } else {
+          ESP_LOGW(TAG, "Parent widget '%s' not found, cannot reparent", parent_id.c_str());
+        }
+      }
     }
 
     apply_properties(obj, root);
@@ -558,6 +577,9 @@ void SentioComponent::register_widget_events(lv_obj_t *obj, const std::string &i
   // LV_EVENT_PRESSED (fires on touch-down) to prevent drag/swipe collisions.
   lv_obj_add_event_cb(obj, sentio_widget_event_cb, LV_EVENT_CLICKED, data);
 
+  // Add support for long press
+  lv_obj_add_event_cb(obj, sentio_widget_event_cb, LV_EVENT_LONG_PRESSED, data);
+
   // Sliders and switches also send value-changed events
   lv_obj_add_event_cb(obj, sentio_widget_event_cb, LV_EVENT_VALUE_CHANGED, data);
 
@@ -584,6 +606,9 @@ void SentioComponent::handle_widget_event(lv_event_t *e, const std::string &widg
     } else {
       value_str = "false";
     }
+  } else if (code == LV_EVENT_LONG_PRESSED) {
+    event_type = "long_pressed";
+    value_str = "";
   } else if (code == LV_EVENT_VALUE_CHANGED) {
     event_type = "value_changed";
     if      (lv_obj_check_type(obj, &lv_slider_class)) {
@@ -604,6 +629,9 @@ void SentioComponent::handle_widget_event(lv_event_t *e, const std::string &widg
   } else {
     return; // Not an event we report
   }
+
+  // Log event locally for easy hardware/HMI debugging
+  ESP_LOGI(TAG, "Widget '%s' event: %s (value: %s)", widget_id.c_str(), event_type.c_str(), value_str.c_str());
 
   // Fire Home Assistant event: esphome.<node>_sentio_event
   fire_homeassistant_event("esphome.sentio_event", {
