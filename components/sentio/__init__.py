@@ -135,10 +135,12 @@ async def to_code(config):
     await cg.register_component(var, config)
 
     # ── Auto-enable API custom service registration ───────────────────────────
-    # SentioComponent calls register_service() which requires these two defines.
-    # Setting them here means the user does NOT need custom_services: true in YAML.
+    # SentioComponent calls register_service() and fire_homeassistant_event()
+    # which require these defines. Setting them here means the user does NOT
+    # need custom_services/homeassistant_services: true in their YAML.
     cg.add_define("USE_API_USER_DEFINED_ACTIONS")
     cg.add_define("USE_API_CUSTOM_SERVICES")
+    cg.add_define("USE_API_HOMEASSISTANT_SERVICES")
 
     # ── Register all LVGL widget types used by the sentio JSONL engine ────────
     # Each entry corresponds to a lv_<widget>_create() call in create_widget().

@@ -380,10 +380,16 @@ lv_obj_t *SentioComponent::create_widget(const std::string &type, lv_obj_t *pare
   if (type == "label")                      return lv_label_create(parent);
   if (type == "button" || type == "btn")    return lv_button_create(parent);  // LVGL v9
   if (type == "slider")                     return lv_slider_create(parent);
+#ifdef LV_USE_SWITCH
   if (type == "switch" || type == "sw")     return lv_switch_create(parent);
+#endif
   if (type == "checkbox" || type == "cb")   return lv_checkbox_create(parent);
+#ifdef LV_USE_DROPDOWN
   if (type == "dropdown" || type == "dd")   return lv_dropdown_create(parent);
+#endif
+#ifdef LV_USE_TEXTAREA
   if (type == "textarea" || type == "ta")   return lv_textarea_create(parent);
+#endif
   if (type == "arc")                        return lv_arc_create(parent);
   if (type == "bar")                        return lv_bar_create(parent);
   if (type == "image" || type == "img")     return lv_image_create(parent);   // LVGL v9
@@ -489,16 +495,17 @@ void SentioComponent::apply_properties(lv_obj_t *obj, JsonObject props) {
   // ── Styles — colors ────────────────────────────────────────────────────
   if (props.containsKey("bg_color")) {
     lv_color_t c = parse_hex_color(props["bg_color"].as<const char *>());
-    lv_obj_set_style_bg_color(obj, c, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_style_selector_t sel = (lv_style_selector_t)(LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(obj, c, sel);
+    lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, sel);
   }
   if (props.containsKey("text_color")) {
     lv_color_t c = parse_hex_color(props["text_color"].as<const char *>());
-    lv_obj_set_style_text_color(obj, c, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(obj, c, (lv_style_selector_t)(LV_PART_MAIN | LV_STATE_DEFAULT));
   }
   if (props.containsKey("border_color")) {
     lv_color_t c = parse_hex_color(props["border_color"].as<const char *>());
-    lv_obj_set_style_border_color(obj, c, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_color(obj, c, (lv_style_selector_t)(LV_PART_MAIN | LV_STATE_DEFAULT));
   }
 
   // ── Styles — geometry ──────────────────────────────────────────────────
@@ -528,9 +535,11 @@ void SentioComponent::apply_properties(lv_obj_t *obj, JsonObject props) {
   }
 
   // ── Dropdown options ───────────────────────────────────────────────────
+#ifdef LV_USE_DROPDOWN
   if (props.containsKey("options") && lv_obj_check_type(obj, &lv_dropdown_class)) {
     lv_dropdown_set_options(obj, props["options"].as<const char *>());
   }
+#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -557,7 +566,7 @@ void SentioComponent::register_widget_events(lv_obj_t *obj, const std::string &i
 
 void SentioComponent::handle_widget_event(lv_event_t *e, const std::string &widget_id) {
   lv_event_code_t code = lv_event_get_code(e);
-  lv_obj_t *obj        = lv_event_get_target(e);
+  lv_obj_t *obj        = static_cast<lv_obj_t *>(lv_event_get_target(e));
 
   std::string event_type;
   std::string value_str;
@@ -576,23 +585,34 @@ void SentioComponent::handle_widget_event(lv_event_t *e, const std::string &widg
       value_str = to_string(lv_slider_get_value(obj));
     } else if (lv_obj_check_type(obj, &lv_arc_class)) {
       value_str = to_string(lv_arc_get_value(obj));
+#ifdef LV_USE_SWITCH
     } else if (lv_obj_check_type(obj, &lv_switch_class)) {
       value_str = lv_obj_has_state(obj, LV_STATE_CHECKED) ? "true" : "false";
+#endif
+#ifdef LV_USE_DROPDOWN
     } else if (lv_obj_check_type(obj, &lv_dropdown_class)) {
       char buf[64] = {0};
       lv_dropdown_get_selected_str(obj, buf, sizeof(buf));
       value_str = buf;
+#endif
     }
   } else {
     return; // Not an event we report
   }
 
-  // Fire Home Assistant event: esphome.<node>_sentio_event
+  // Fire Home Assistant event: esphome.sentio_event
+  // Guarded: requires homeassistant_services: true in api: section, OR
+  // USE_API_HOMEASSISTANT_SERVICES injected by __init__.py via cg.add_define.
+#ifdef USE_API_HOMEASSISTANT_SERVICES
   fire_homeassistant_event("esphome.sentio_event", {
     {"widget_id", widget_id},
     {"event",     event_type},
     {"value",     value_str},
   });
+#else
+  ESP_LOGD(TAG, "Widget event [%s] %s=%s (enable homeassistant_services in api: for HA events)",
+           widget_id.c_str(), event_type.c_str(), value_str.c_str());
+#endif
 
   // Reset idle timer on any widget interaction
   last_activity_ms_ = millis();
