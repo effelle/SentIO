@@ -15,13 +15,6 @@ from esphome import automation
 from esphome.components import light, output, touchscreen
 from esphome.const import CONF_ID, CONF_TRIGGER_ID
 
-# add_lv_use was introduced in a later ESPHome release; fall back gracefully
-try:
-    from esphome.components.lvgl.helpers import add_lv_use
-except ImportError:
-    def add_lv_use(*_args):  # noqa: E306 — no-op for older ESPHome builds
-        pass
-
 CODEOWNERS = ["@effelle"]
 DEPENDENCIES = ["api", "lvgl"]
 AUTO_LOAD = ["json"]
@@ -133,32 +126,6 @@ CONFIG_SCHEMA = cv.Schema({
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
-
-    # ── Auto-enable API custom service registration ───────────────────────────
-    # SentioComponent calls register_service() and fire_homeassistant_event()
-    # which require these defines. Setting them here means the user does NOT
-    # need custom_services/homeassistant_services: true in their YAML.
-    cg.add_define("USE_API_USER_DEFINED_ACTIONS")
-    cg.add_define("USE_API_CUSTOM_SERVICES")
-    cg.add_define("USE_API_HOMEASSISTANT_SERVICES")
-
-    # ── Register all LVGL widget types used by the sentio JSONL engine ────────
-    # Each entry corresponds to a lv_<widget>_create() call in create_widget().
-    # Without these, the LVGL build system strips the widget source files.
-    add_lv_use(
-        "OBJ",
-        "LABEL",
-        "BTN",
-        "SLIDER",
-        "SWITCH",
-        "CHECKBOX",
-        "DROPDOWN",
-        "TEXTAREA",
-        "ARC",
-        "BAR",
-        "IMG",
-        "SPINNER",
-    )
 
     # Touch source (optional smart-touch proxy)
     if CONF_TOUCH_SOURCE in config:

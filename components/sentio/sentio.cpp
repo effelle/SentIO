@@ -2,7 +2,6 @@
 
 #include "esphome/core/log.h"
 #include "esphome/core/application.h"
-#include "esphome/components/json/json_util.h"
 
 // LittleFS — Arduino framework only (IDF path is a Phase 4 enhancement)
 #ifdef USE_ARDUINO
@@ -119,7 +118,7 @@ void SentioComponent::loop() {
   uint32_t now = millis();
 
   // ── Track touch activity from upstream driver ────────────────────────────
-  if (touch_source_ != nullptr && !touch_source_->get_touches().empty()) {
+  if (touch_source_ != nullptr && !touch_source_->touches.empty()) {
     if (is_sleeping_) {
       // Touch while sleeping: wake up, optionally suppress this first event
       wake_up();
@@ -315,7 +314,7 @@ void SentioComponent::service_save_layout_line(std::string line, bool append) {
 void SentioComponent::parse_jsonl_line(const std::string &line) {
   bool ok = json::parse_json(line, [&](JsonObject root) -> bool {
     // Every valid line must have an "id" field
-    if (root["id"].isNull()) {
+    if (!root.containsKey("id")) {
       ESP_LOGW(TAG, "JSONL line missing 'id' field: %s", line.c_str());
       return false;
     }
@@ -323,7 +322,7 @@ void SentioComponent::parse_jsonl_line(const std::string &line) {
     std::string id = root["id"].as<std::string>();
 
     // Delete command: {"id": "my_widget", "delete": true}
-    if (root["delete"].is<bool>() && root["delete"].as<bool>()) {
+    if (root.containsKey("delete") && root["delete"].as<bool>()) {
       auto it = widgets_.find(id);
       if (it != widgets_.end()) {
         lv_obj_del(it->second);
@@ -335,7 +334,7 @@ void SentioComponent::parse_jsonl_line(const std::string &line) {
 
     lv_obj_t *obj = nullptr;
 
-    if (root["obj"].is<const char *>()) {
+    if (root.containsKey("obj")) {
       // Creation mode: widget does not yet exist (or we replace it)
       std::string type = root["obj"].as<std::string>();
       auto it = widgets_.find(id);
@@ -495,9 +494,9 @@ void SentioComponent::apply_properties(lv_obj_t *obj, JsonObject props) {
   // ── Styles — colors ────────────────────────────────────────────────────
   if (props["bg_color"].is<const char *>()) {
     lv_color_t c = parse_hex_color(props["bg_color"].as<const char *>());
-    lv_style_selector_t sel = (lv_style_selector_t)((uint32_t)LV_PART_MAIN | (uint32_t)LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(obj, c, sel);
-    lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, sel);
+    lv_style_selector_t bg_sel = (lv_style_selector_t)((uint32_t)LV_PART_MAIN | (uint32_t)LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(obj, c, bg_sel);
+    lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, bg_sel);
   }
   if (props["text_color"].is<const char *>()) {
     lv_color_t c = parse_hex_color(props["text_color"].as<const char *>());
@@ -566,7 +565,7 @@ void SentioComponent::register_widget_events(lv_obj_t *obj, const std::string &i
 
 void SentioComponent::handle_widget_event(lv_event_t *e, const std::string &widget_id) {
   lv_event_code_t code = lv_event_get_code(e);
-  lv_obj_t *obj        = static_cast<lv_obj_t *>(lv_event_get_target(e));
+  lv_obj_t *obj        = lv_event_get_target(e);
 
   std::string event_type;
   std::string value_str;
@@ -600,19 +599,12 @@ void SentioComponent::handle_widget_event(lv_event_t *e, const std::string &widg
     return; // Not an event we report
   }
 
-  // Fire Home Assistant event: esphome.sentio_event
-  // Guarded: requires homeassistant_services: true in api: section, OR
-  // USE_API_HOMEASSISTANT_SERVICES injected by __init__.py via cg.add_define.
-#ifdef USE_API_HOMEASSISTANT_SERVICES
+  // Fire Home Assistant event: esphome.<node>_sentio_event
   fire_homeassistant_event("esphome.sentio_event", {
     {"widget_id", widget_id},
     {"event",     event_type},
     {"value",     value_str},
   });
-#else
-  ESP_LOGD(TAG, "Widget event [%s] %s=%s (enable homeassistant_services in api: for HA events)",
-           widget_id.c_str(), event_type.c_str(), value_str.c_str());
-#endif
 
   // Reset idle timer on any widget interaction
   last_activity_ms_ = millis();

@@ -4,15 +4,13 @@
 #include "esphome/core/helpers.h"
 #include "esphome/core/log.h"
 #include "esphome/core/automation.h"
+#include "esphome/core/json_util.h"
 #include "esphome/components/api/custom_api_device.h"
 #include "esphome/components/touchscreen/touchscreen.h"
 #include "esphome/components/light/light_state.h"
 #include "esphome/components/output/float_output.h"
-// json_util is included in sentio.cpp only; ArduinoJson types used here
-// are forward-declared via the ArduinoJson header pulled by automation.h.
 
 #include "lvgl.h"
-#include <ArduinoJson.h>  // for JsonObject in apply_properties signature
 
 #ifdef USE_SENSOR
 #include "esphome/components/sensor/sensor.h"
@@ -149,9 +147,6 @@ class SentioComponent : public Component, public api::CustomAPIDevice {
   // ── LVGL burn-in shift (called from static timer callback) ───────────────
   void do_burn_in_shift();
 
-  // ── wake_up() is public so static shield callback can call it ─────────────
-  void wake_up();
-
   // ── Local sensor registration & binding ───────────────────────────────────
 #ifdef USE_SENSOR
   void register_local_sensor(const std::string &name, sensor::Sensor *sensor);
@@ -190,12 +185,6 @@ class SentioComponent : public Component, public api::CustomAPIDevice {
   int8_t burn_in_dx_{1};
   int8_t burn_in_dy_{1};
 
-  // ── Widget registry ───────────────────────────────────────────────────────
-  std::unordered_map<std::string, lv_obj_t*> widgets_;
-
-  // ── Startup layout path ───────────────────────────────────────────────────
-  std::string startup_layout_;
-
   // ── Active Page ───────────────────────────────────────────────────────────
   std::string active_page_id_;
 
@@ -216,7 +205,7 @@ class SentioComponent : public Component, public api::CustomAPIDevice {
 
   // ── Internal helpers ──────────────────────────────────────────────────────
   void enter_sleep();
-  // wake_up() moved to public — called from static shield callback
+  void wake_up();
   void set_backlight(float level);
   void spawn_shield();
   void destroy_shield();
