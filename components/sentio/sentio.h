@@ -147,6 +147,9 @@ class SentioComponent : public Component, public api::CustomAPIDevice {
   // ── LVGL burn-in shift (called from static timer callback) ───────────────
   void do_burn_in_shift();
 
+  void enter_sleep();
+  void wake_up();
+
   // ── Local sensor registration & binding ───────────────────────────────────
 #ifdef USE_SENSOR
   void register_local_sensor(const std::string &name, sensor::Sensor *sensor);
@@ -187,6 +190,8 @@ class SentioComponent : public Component, public api::CustomAPIDevice {
 
   // ── Active Page ───────────────────────────────────────────────────────────
   std::string active_page_id_;
+  std::string startup_layout_;
+  std::unordered_map<std::string, lv_obj_t*> widgets_;
 
   // ── Local sensors ─────────────────────────────────────────────────────────
 #ifdef USE_SENSOR
@@ -204,8 +209,6 @@ class SentioComponent : public Component, public api::CustomAPIDevice {
   CallbackManager<void(std::string)> on_page_hide_callbacks_;
 
   // ── Internal helpers ──────────────────────────────────────────────────────
-  void enter_sleep();
-  void wake_up();
   void set_backlight(float level);
   void spawn_shield();
   void destroy_shield();

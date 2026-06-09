@@ -22,6 +22,7 @@ logger:
   level: DEBUG
 
 api:
+  custom_services: true
   encryption:
     key: !secret api_key
 

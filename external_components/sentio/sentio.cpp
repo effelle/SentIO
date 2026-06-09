@@ -118,7 +118,7 @@ void SentioComponent::loop() {
   uint32_t now = millis();
 
   // ── Track touch activity from upstream driver ────────────────────────────
-  if (touch_source_ != nullptr && !touch_source_->touches.empty()) {
+  if (touch_source_ != nullptr && !touch_source_->get_touches().empty()) {
     if (is_sleeping_) {
       // Touch while sleeping: wake up, optionally suppress this first event
       wake_up();
