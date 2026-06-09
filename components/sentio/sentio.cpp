@@ -315,7 +315,7 @@ void SentioComponent::service_save_layout_line(std::string line, bool append) {
 void SentioComponent::parse_jsonl_line(const std::string &line) {
   bool ok = json::parse_json(line, [&](JsonObject root) -> bool {
     // Every valid line must have an "id" field
-    if (!root.containsKey("id")) {
+    if (root["id"].isNull()) {
       ESP_LOGW(TAG, "JSONL line missing 'id' field: %s", line.c_str());
       return false;
     }
@@ -323,7 +323,7 @@ void SentioComponent::parse_jsonl_line(const std::string &line) {
     std::string id = root["id"].as<std::string>();
 
     // Delete command: {"id": "my_widget", "delete": true}
-    if (root.containsKey("delete") && root["delete"].as<bool>()) {
+    if (root["delete"].is<bool>() && root["delete"].as<bool>()) {
       auto it = widgets_.find(id);
       if (it != widgets_.end()) {
         lv_obj_del(it->second);
@@ -335,7 +335,7 @@ void SentioComponent::parse_jsonl_line(const std::string &line) {
 
     lv_obj_t *obj = nullptr;
 
-    if (root.containsKey("obj")) {
+    if (root["obj"].is<const char *>()) {
       // Creation mode: widget does not yet exist (or we replace it)
       std::string type = root["obj"].as<std::string>();
       auto it = widgets_.find(id);
@@ -403,19 +403,19 @@ lv_obj_t *SentioComponent::create_widget(const std::string &type, lv_obj_t *pare
 
 void SentioComponent::apply_properties(lv_obj_t *obj, JsonObject props) {
   // ── Position & size ────────────────────────────────────────────────────
-  if (props.containsKey("x")) lv_obj_set_x(obj, props["x"].as<int>());
-  if (props.containsKey("y")) lv_obj_set_y(obj, props["y"].as<int>());
-  if (props.containsKey("w") || props.containsKey("width")) {
-    int w = props.containsKey("w") ? props["w"].as<int>() : props["width"].as<int>();
+  if (props["x"].is<int>()) lv_obj_set_x(obj, props["x"].as<int>());
+  if (props["y"].is<int>()) lv_obj_set_y(obj, props["y"].as<int>());
+  if (props["w"].is<int>() || props["width"].is<int>()) {
+    int w = props["w"].is<int>() ? props["w"].as<int>() : props["width"].as<int>();
     lv_obj_set_width(obj, w);
   }
-  if (props.containsKey("h") || props.containsKey("height")) {
-    int h = props.containsKey("h") ? props["h"].as<int>() : props["height"].as<int>();
+  if (props["h"].is<int>() || props["height"].is<int>()) {
+    int h = props["h"].is<int>() ? props["h"].as<int>() : props["height"].as<int>();
     lv_obj_set_height(obj, h);
   }
 
   // ── Alignment ──────────────────────────────────────────────────────────
-  if (props.containsKey("align")) {
+  if (props["align"].is<const char *>()) {
     const char *a = props["align"].as<const char *>();
     lv_align_t align = LV_ALIGN_DEFAULT;
     if      (strcmp(a, "center")       == 0) align = LV_ALIGN_CENTER;
@@ -431,7 +431,7 @@ void SentioComponent::apply_properties(lv_obj_t *obj, JsonObject props) {
   }
 
   // ── Text content ───────────────────────────────────────────────────────
-  if (props.containsKey("text")) {
+  if (props["text"].is<const char *>()) {
     const char *text = props["text"].as<const char *>();
     if (lv_obj_check_type(obj, &lv_label_class)) {
       lv_label_set_text(obj, text);
@@ -449,7 +449,7 @@ void SentioComponent::apply_properties(lv_obj_t *obj, JsonObject props) {
   }
 
   // ── Numeric value (sliders, arcs, bars) ───────────────────────────────
-  if (props.containsKey("value")) {
+  if (props["value"].is<int>()) {
     int val = props["value"].as<int>();
     if      (lv_obj_check_type(obj, &lv_slider_class)) lv_slider_set_value(obj, val, LV_ANIM_OFF);
     else if (lv_obj_check_type(obj, &lv_arc_class))    lv_arc_set_value(obj, val);
@@ -457,16 +457,16 @@ void SentioComponent::apply_properties(lv_obj_t *obj, JsonObject props) {
   }
 
   // ── Range (min/max for sliders, arcs) ─────────────────────────────────
-  if (props.containsKey("min") || props.containsKey("max")) {
-    int mn = props.containsKey("min") ? props["min"].as<int>() : 0;
-    int mx = props.containsKey("max") ? props["max"].as<int>() : 100;
+  if (props["min"].is<int>() || props["max"].is<int>()) {
+    int mn = props["min"].is<int>() ? props["min"].as<int>() : 0;
+    int mx = props["max"].is<int>() ? props["max"].as<int>() : 100;
     if      (lv_obj_check_type(obj, &lv_slider_class)) lv_slider_set_range(obj, mn, mx);
     else if (lv_obj_check_type(obj, &lv_arc_class))    lv_arc_set_range(obj, mn, mx);
     else if (lv_obj_check_type(obj, &lv_bar_class))    lv_bar_set_range(obj, mn, mx);
   }
 
   // ── Checked state ──────────────────────────────────────────────────────
-  if (props.containsKey("checked")) {
+  if (props["checked"].is<bool>()) {
     if (props["checked"].as<bool>()) {
       lv_obj_add_state(obj, LV_STATE_CHECKED);
     } else {
@@ -475,7 +475,7 @@ void SentioComponent::apply_properties(lv_obj_t *obj, JsonObject props) {
   }
 
   // ── Visibility ─────────────────────────────────────────────────────────
-  if (props.containsKey("hidden")) {
+  if (props["hidden"].is<bool>()) {
     if (props["hidden"].as<bool>()) {
       lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
     } else {
@@ -484,7 +484,7 @@ void SentioComponent::apply_properties(lv_obj_t *obj, JsonObject props) {
   }
 
   // ── Scrollable ─────────────────────────────────────────────────────────
-  if (props.containsKey("scrollable")) {
+  if (props["scrollable"].is<bool>()) {
     if (props["scrollable"].as<bool>()) {
       lv_obj_add_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
     } else {
@@ -493,50 +493,50 @@ void SentioComponent::apply_properties(lv_obj_t *obj, JsonObject props) {
   }
 
   // ── Styles — colors ────────────────────────────────────────────────────
-  if (props.containsKey("bg_color")) {
+  if (props["bg_color"].is<const char *>()) {
     lv_color_t c = parse_hex_color(props["bg_color"].as<const char *>());
-    lv_style_selector_t sel = (lv_style_selector_t)(LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_style_selector_t sel = (lv_style_selector_t)((uint32_t)LV_PART_MAIN | (uint32_t)LV_STATE_DEFAULT);
     lv_obj_set_style_bg_color(obj, c, sel);
     lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, sel);
   }
-  if (props.containsKey("text_color")) {
+  if (props["text_color"].is<const char *>()) {
     lv_color_t c = parse_hex_color(props["text_color"].as<const char *>());
-    lv_obj_set_style_text_color(obj, c, (lv_style_selector_t)(LV_PART_MAIN | LV_STATE_DEFAULT));
+    lv_obj_set_style_text_color(obj, c, (lv_style_selector_t)((uint32_t)LV_PART_MAIN | (uint32_t)LV_STATE_DEFAULT));
   }
-  if (props.containsKey("border_color")) {
+  if (props["border_color"].is<const char *>()) {
     lv_color_t c = parse_hex_color(props["border_color"].as<const char *>());
-    lv_obj_set_style_border_color(obj, c, (lv_style_selector_t)(LV_PART_MAIN | LV_STATE_DEFAULT));
+    lv_obj_set_style_border_color(obj, c, (lv_style_selector_t)((uint32_t)LV_PART_MAIN | (uint32_t)LV_STATE_DEFAULT));
   }
 
   // ── Styles — geometry ──────────────────────────────────────────────────
-  if (props.containsKey("radius")) {
+  if (props["radius"].is<int>()) {
     lv_obj_set_style_radius(obj, props["radius"].as<int>(), LV_PART_MAIN);
   }
-  if (props.containsKey("border_width")) {
+  if (props["border_width"].is<int>()) {
     lv_obj_set_style_border_width(obj, props["border_width"].as<int>(), LV_PART_MAIN);
   }
-  if (props.containsKey("pad")) {
+  if (props["pad"].is<int>()) {
     lv_obj_set_style_pad_all(obj, props["pad"].as<int>(), LV_PART_MAIN);
   }
-  if (props.containsKey("pad_top"))    lv_obj_set_style_pad_top(obj,    props["pad_top"].as<int>(),    LV_PART_MAIN);
-  if (props.containsKey("pad_bottom")) lv_obj_set_style_pad_bottom(obj, props["pad_bottom"].as<int>(), LV_PART_MAIN);
-  if (props.containsKey("pad_left"))   lv_obj_set_style_pad_left(obj,   props["pad_left"].as<int>(),   LV_PART_MAIN);
-  if (props.containsKey("pad_right"))  lv_obj_set_style_pad_right(obj,  props["pad_right"].as<int>(),  LV_PART_MAIN);
+  if (props["pad_top"].is<int>())    lv_obj_set_style_pad_top(obj,    props["pad_top"].as<int>(),    LV_PART_MAIN);
+  if (props["pad_bottom"].is<int>()) lv_obj_set_style_pad_bottom(obj, props["pad_bottom"].as<int>(), LV_PART_MAIN);
+  if (props["pad_left"].is<int>())   lv_obj_set_style_pad_left(obj,   props["pad_left"].as<int>(),   LV_PART_MAIN);
+  if (props["pad_right"].is<int>())  lv_obj_set_style_pad_right(obj,  props["pad_right"].as<int>(),  LV_PART_MAIN);
 
   // ── Opacity ────────────────────────────────────────────────────────────
-  if (props.containsKey("opacity") || props.containsKey("opa")) {
-    int opa = props.containsKey("opacity") ? props["opacity"].as<int>() : props["opa"].as<int>();
+  if (props["opacity"].is<int>() || props["opa"].is<int>()) {
+    int opa = props["opacity"].is<int>() ? props["opacity"].as<int>() : props["opa"].as<int>();
     lv_obj_set_style_opa(obj, (lv_opa_t)opa, LV_PART_MAIN);
   }
 
   // ── Image source path ──────────────────────────────────────────────────
-  if (props.containsKey("src") && lv_obj_check_type(obj, &lv_image_class)) {
+  if (props["src"].is<const char *>() && lv_obj_check_type(obj, &lv_image_class)) {
     lv_image_set_src(obj, props["src"].as<const char *>());
   }
 
   // ── Dropdown options ───────────────────────────────────────────────────
 #ifdef LV_USE_DROPDOWN
-  if (props.containsKey("options") && lv_obj_check_type(obj, &lv_dropdown_class)) {
+  if (props["options"].is<const char *>() && lv_obj_check_type(obj, &lv_dropdown_class)) {
     lv_dropdown_set_options(obj, props["options"].as<const char *>());
   }
 #endif
