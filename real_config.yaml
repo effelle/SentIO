@@ -1,5 +1,56 @@
 esphome:
   name: sentio-test
+  on_boot:
+    priority: -100.0  # Runs after setup completes (LATE - 100)
+    then:
+      - lambda: |-
+          // Create page 1 container
+          id(my_sentio)->service_run_jsonl("{\"id\":\"page1\",\"obj\":\"container\",\"hidden\":false}");
+          id(my_sentio)->service_run_jsonl("{\"id\":\"page1\",\"bg_color\":\"#0D1117\"}");
+          
+          // Header labels
+          id(my_sentio)->service_run_jsonl("{\"id\":\"lbl_title\",\"obj\":\"label\",\"parent\":\"page1\",\"x\":20,\"y\":15,\"text\":\"SentIO Touch & Gesture Test\"}");
+          id(my_sentio)->service_run_jsonl("{\"id\":\"lbl_title\",\"text_color\":\"#E6EDF0\"}");
+          
+          id(my_sentio)->service_run_jsonl("{\"id\":\"lbl_info\",\"obj\":\"label\",\"parent\":\"page1\",\"x\":20,\"y\":45,\"text\":\"Interact & observe serial logs. Swipe to change page.\"}");
+          id(my_sentio)->service_run_jsonl("{\"id\":\"lbl_info\",\"text_color\":\"#8B949E\"}");
+          
+          // Interactive button
+          id(my_sentio)->service_run_jsonl("{\"id\":\"btn_press\",\"obj\":\"button\",\"parent\":\"page1\",\"x\":20,\"y\":85,\"w\":180,\"h\":50,\"text\":\"Tap / Hold Me\"}");
+          id(my_sentio)->service_run_jsonl("{\"id\":\"btn_press\",\"bg_color\":\"#21262D\"}");
+          
+          // Slider
+          id(my_sentio)->service_run_jsonl("{\"id\":\"lbl_slider\",\"obj\":\"label\",\"parent\":\"page1\",\"x\":220,\"y\":85,\"text\":\"Drag Slider:\"}");
+          id(my_sentio)->service_run_jsonl("{\"id\":\"lbl_slider\",\"text_color\":\"#8B949E\"}");
+          
+          id(my_sentio)->service_run_jsonl("{\"id\":\"sld_test\",\"obj\":\"slider\",\"parent\":\"page1\",\"x\":220,\"y\":110,\"w\":220,\"h\":25,\"min\":0,\"max\":100,\"value\":60}");
+          
+          // Switch
+          id(my_sentio)->service_run_jsonl("{\"id\":\"lbl_sw\",\"obj\":\"label\",\"parent\":\"page1\",\"x\":20,\"y\":165,\"text\":\"Toggle Switch:\"}");
+          id(my_sentio)->service_run_jsonl("{\"id\":\"lbl_sw\",\"text_color\":\"#8B949E\"}");
+          
+          id(my_sentio)->service_run_jsonl("{\"id\":\"sw_test\",\"obj\":\"switch\",\"parent\":\"page1\",\"x\":20,\"y\":190,\"w\":70,\"h\":35,\"checked\":false}");
+          
+          // Dropdown
+          id(my_sentio)->service_run_jsonl("{\"id\":\"lbl_dd\",\"obj\":\"label\",\"parent\":\"page1\",\"x\":150,\"y\":165,\"text\":\"Select Option:\"}");
+          id(my_sentio)->service_run_jsonl("{\"id\":\"lbl_dd\",\"text_color\":\"#8B949E\"}");
+          
+          id(my_sentio)->service_run_jsonl("{\"id\":\"dd_test\",\"obj\":\"dropdown\",\"parent\":\"page1\",\"x\":150,\"y\":190,\"w\":160,\"h\":40,\"options\":\"Option A\\nOption B\\nOption C\"}");
+          
+          // Sensor-bound label
+          id(my_sentio)->service_run_jsonl("{\"id\":\"lbl_sensor\",\"obj\":\"label\",\"parent\":\"page1\",\"x\":330,\"y\":175,\"text\":\"Temp: ---\"}");
+          id(my_sentio)->service_run_jsonl("{\"id\":\"lbl_sensor\",\"text_color\":\"#58A6FF\"}");
+          id(my_sentio)->service_bind_sensor("lbl_sensor", "my_temp_sensor", "Temp: %.1f °C");
+          
+          // ── Page 2 Container (initially hidden) ──
+          id(my_sentio)->service_run_jsonl("{\"id\":\"page2\",\"obj\":\"container\",\"hidden\":true}");
+          id(my_sentio)->service_run_jsonl("{\"id\":\"page2\",\"bg_color\":\"#161B22\"}");
+          
+          id(my_sentio)->service_run_jsonl("{\"id\":\"lbl_title2\",\"obj\":\"label\",\"parent\":\"page2\",\"x\":20,\"y\":20,\"text\":\"Page 2: Gesture Navigation Work\"}");
+          id(my_sentio)->service_run_jsonl("{\"id\":\"lbl_title2\",\"text_color\":\"#58A6FF\"}");
+          
+          id(my_sentio)->service_run_jsonl("{\"id\":\"lbl_info2\",\"obj\":\"label\",\"parent\":\"page2\",\"x\":20,\"y\":60,\"text\":\"Swipe right to switch back to Page 1.\"}");
+          id(my_sentio)->service_run_jsonl("{\"id\":\"lbl_info2\",\"text_color\":\"#8B949E\"}");
   # platformio_options:
   #   upload_speed: 921120
   #   board_build.flash_mode: dio
@@ -145,6 +196,7 @@ sensor:
 
 # ── SentIO overlay ────────────────────────────────────────────────────────────
 sentio:
+  id: my_sentio
   # Optional: link to the touch driver for smart-touch features.
   # If omitted, SentIO still manages JSONL widgets and backlight.
   touch_source: my_touch
@@ -170,9 +222,11 @@ sentio:
 
   # Swipe gesture automations (local, connection-independent)
   on_swipe_left:
-    - logger.log: "SentIO gesture: swiped left!"
+    - lambda: |-
+        id(my_sentio)->service_load_page("page2");
   on_swipe_right:
-    - logger.log: "SentIO gesture: swiped right!"
+    - lambda: |-
+        id(my_sentio)->service_load_page("page1");
 
   # Page lifecycle event automations (passes page ID as string 'x')
   on_page_show:
