@@ -9,6 +9,12 @@
 #  include "LittleFS.h"
 #endif
 
+// Pull in the full LVGL API so all widget create/class/get symbols are
+// available. sentio.h already includes lvgl.h via the sentio header, but
+// ESPHome may not guarantee that all widget headers are transitively
+// included — this explicit include ensures they are.
+#include "lvgl.h"
+
 namespace esphome {
 namespace sentio {
 
@@ -411,8 +417,14 @@ void SentioComponent::parse_jsonl_line(const std::string &line) {
 lv_obj_t *SentioComponent::create_widget(const std::string &type, lv_obj_t *parent) {
   if (type == "obj" || type == "container") return lv_obj_create(parent);
   if (type == "label")                      return lv_label_create(parent);
-  if (type == "button" || type == "btn")    return lv_button_create(parent);  // LVGL v9
+#if LVGL_VERSION_MAJOR >= 9
+  if (type == "button" || type == "btn")    return lv_button_create(parent);
+#else
+  if (type == "button" || type == "btn")    return lv_btn_create(parent);
+#endif
+#if LV_USE_SLIDER
   if (type == "slider")                     return lv_slider_create(parent);
+#endif
 #if LV_USE_SWITCH
   if (type == "switch" || type == "sw")     return lv_switch_create(parent);
 #endif
@@ -425,10 +437,26 @@ lv_obj_t *SentioComponent::create_widget(const std::string &type, lv_obj_t *pare
 #if LV_USE_TEXTAREA
   if (type == "textarea" || type == "ta")   return lv_textarea_create(parent);
 #endif
+#if LV_USE_ARC
   if (type == "arc")                        return lv_arc_create(parent);
+#endif
+#if LV_USE_BAR
   if (type == "bar")                        return lv_bar_create(parent);
-  if (type == "image" || type == "img")     return lv_image_create(parent);   // LVGL v9
+#endif
+#if LV_USE_IMG || LV_USE_IMAGE
+#  if LVGL_VERSION_MAJOR >= 9
+  if (type == "image" || type == "img")     return lv_image_create(parent);
+#  else
+  if (type == "image" || type == "img")     return lv_img_create(parent);
+#  endif
+#endif
+#if LV_USE_SPINNER
+#if LVGL_VERSION_MAJOR >= 9
   if (type == "spinner")                    return lv_spinner_create(parent);
+#else
+  if (type == "spinner")                    return lv_spinner_create(parent, 1000, 60);
+#endif
+#endif
   return nullptr;
 }
 
@@ -474,7 +502,11 @@ void SentioComponent::apply_properties(lv_obj_t *obj, JsonObject props) {
     } else if (lv_obj_check_type(obj, &lv_checkbox_class)) {
       lv_checkbox_set_text(obj, text);
 #endif
+#if LVGL_VERSION_MAJOR >= 9
     } else if (lv_obj_check_type(obj, &lv_button_class)) {
+#else
+    } else if (lv_obj_check_type(obj, &lv_btn_class)) {
+#endif
       // Auto-create a child label on the button if text is provided
       lv_obj_t *existing_label = lv_obj_get_child(obj, 0);
       if (existing_label == nullptr || !lv_obj_check_type(existing_label, &lv_label_class)) {
@@ -488,18 +520,36 @@ void SentioComponent::apply_properties(lv_obj_t *obj, JsonObject props) {
   // ── Numeric value (sliders, arcs, bars) ───────────────────────────────
   if (props["value"].is<int>()) {
     int val = props["value"].as<int>();
+#if LV_USE_SLIDER
     if      (lv_obj_check_type(obj, &lv_slider_class)) lv_slider_set_value(obj, val, LV_ANIM_OFF);
-    else if (lv_obj_check_type(obj, &lv_arc_class))    lv_arc_set_value(obj, val);
-    else if (lv_obj_check_type(obj, &lv_bar_class))    lv_bar_set_value(obj, val, LV_ANIM_OFF);
+    else
+#endif
+#if LV_USE_ARC
+    if      (lv_obj_check_type(obj, &lv_arc_class))    lv_arc_set_value(obj, val);
+    else
+#endif
+#if LV_USE_BAR
+    if      (lv_obj_check_type(obj, &lv_bar_class))    lv_bar_set_value(obj, val, LV_ANIM_OFF);
+#endif
+    {}
   }
 
   // ── Range (min/max for sliders, arcs) ─────────────────────────────────
   if (props["min"].is<int>() || props["max"].is<int>()) {
     int mn = props["min"].is<int>() ? props["min"].as<int>() : 0;
     int mx = props["max"].is<int>() ? props["max"].as<int>() : 100;
+#if LV_USE_SLIDER
     if      (lv_obj_check_type(obj, &lv_slider_class)) lv_slider_set_range(obj, mn, mx);
-    else if (lv_obj_check_type(obj, &lv_arc_class))    lv_arc_set_range(obj, mn, mx);
-    else if (lv_obj_check_type(obj, &lv_bar_class))    lv_bar_set_range(obj, mn, mx);
+    else
+#endif
+#if LV_USE_ARC
+    if      (lv_obj_check_type(obj, &lv_arc_class))    lv_arc_set_range(obj, mn, mx);
+    else
+#endif
+#if LV_USE_BAR
+    if      (lv_obj_check_type(obj, &lv_bar_class))    lv_bar_set_range(obj, mn, mx);
+#endif
+    {}
   }
 
   // ── Checked state ──────────────────────────────────────────────────────
@@ -567,9 +617,15 @@ void SentioComponent::apply_properties(lv_obj_t *obj, JsonObject props) {
   }
 
   // ── Image source path ──────────────────────────────────────────────────
-  if (props["src"].is<const char *>() && lv_obj_check_type(obj, &lv_image_class)) {
-    lv_image_set_src(obj, props["src"].as<const char *>());
+#if LV_USE_IMG || LV_USE_IMAGE
+  if (props["src"].is<const char *>()) {
+#  if LVGL_VERSION_MAJOR >= 9
+    if (lv_obj_check_type(obj, &lv_image_class)) lv_image_set_src(obj, props["src"].as<const char *>());
+#  else
+    if (lv_obj_check_type(obj, &lv_img_class))   lv_img_set_src(obj,   props["src"].as<const char *>());
+#  endif
   }
+#endif
 
   // ── Dropdown options ───────────────────────────────────────────────────
 #if LV_USE_DROPDOWN
@@ -624,20 +680,30 @@ void SentioComponent::handle_widget_event(lv_event_t *e, const std::string &widg
     value_str = "";
   } else if (code == LV_EVENT_VALUE_CHANGED) {
     event_type = "value_changed";
-    if      (lv_obj_check_type(obj, &lv_slider_class)) {
+#if LV_USE_SLIDER
+    if (lv_obj_check_type(obj, &lv_slider_class)) {
       value_str = to_string(lv_slider_get_value(obj));
-    } else if (lv_obj_check_type(obj, &lv_arc_class)) {
+    } else
+#endif
+#if LV_USE_ARC
+    if (lv_obj_check_type(obj, &lv_arc_class)) {
       value_str = to_string(lv_arc_get_value(obj));
+    } else
+#endif
 #if LV_USE_SWITCH
-    } else if (lv_obj_check_type(obj, &lv_switch_class)) {
+    if (lv_obj_check_type(obj, &lv_switch_class)) {
       value_str = lv_obj_has_state(obj, LV_STATE_CHECKED) ? "true" : "false";
+    } else
 #endif
 #if LV_USE_DROPDOWN
-    } else if (lv_obj_check_type(obj, &lv_dropdown_class)) {
+    if (lv_obj_check_type(obj, &lv_dropdown_class)) {
       char buf[64] = {0};
       lv_dropdown_get_selected_str(obj, buf, sizeof(buf));
       value_str = buf;
+    } else
 #endif
+    {
+      // Unknown widget type — leave value_str empty
     }
   } else {
     return; // Not an event we report
@@ -763,7 +829,11 @@ void SentioComponent::bind_sensor(const std::string &widget_id, const std::strin
       } else if (lv_obj_check_type(obj, &lv_checkbox_class)) {
         lv_checkbox_set_text(obj, buf);
 #endif
+#if LVGL_VERSION_MAJOR >= 9
       } else if (lv_obj_check_type(obj, &lv_button_class)) {
+#else
+      } else if (lv_obj_check_type(obj, &lv_btn_class)) {
+#endif
         lv_obj_t *existing_label = lv_obj_get_child(obj, 0);
         if (existing_label == nullptr || !lv_obj_check_type(existing_label, &lv_label_class)) {
           existing_label = lv_label_create(obj);
@@ -789,7 +859,11 @@ void SentioComponent::bind_sensor(const std::string &widget_id, const std::strin
       } else if (lv_obj_check_type(obj, &lv_checkbox_class)) {
         lv_checkbox_set_text(obj, buf);
 #endif
+#if LVGL_VERSION_MAJOR >= 9
       } else if (lv_obj_check_type(obj, &lv_button_class)) {
+#else
+      } else if (lv_obj_check_type(obj, &lv_btn_class)) {
+#endif
         lv_obj_t *existing_label = lv_obj_get_child(obj, 0);
         if (existing_label == nullptr || !lv_obj_check_type(existing_label, &lv_label_class)) {
           existing_label = lv_label_create(obj);

@@ -1,62 +1,10 @@
-# test_node.yaml — SentIO development test node
-# Target board: JC3248W535C_I_Y (ESP32-S3, ST7796 display, GT911 touch)
-# Adjust pins to match your specific wiring.
+# test_node.yaml — SentIO touch test
+# Tests: tap, long press, swipe left/right/up/down
+# All results printed to serial logger + shown on screen.
 
 esphome:
   name: sentio-test
-  friendly_name: SentIO Test Node
-  on_boot:
-    priority: -100.0  # Runs after setup completes (LATE - 100)
-    then:
-      - lambda: |-
-          auto *my_sentio = esphome::sentio::SentioComponent::instance;
-          // Create page 1 container
-          my_sentio->service_run_jsonl("{\"id\":\"page1\",\"obj\":\"container\",\"hidden\":false}");
-          my_sentio->service_run_jsonl("{\"id\":\"page1\",\"bg_color\":\"#0D1117\"}");
-          
-          // Header labels
-          my_sentio->service_run_jsonl("{\"id\":\"lbl_title\",\"obj\":\"label\",\"parent\":\"page1\",\"x\":20,\"y\":15,\"text\":\"SentIO Touch & Gesture Test\"}");
-          my_sentio->service_run_jsonl("{\"id\":\"lbl_title\",\"text_color\":\"#E6EDF0\"}");
-          
-          my_sentio->service_run_jsonl("{\"id\":\"lbl_info\",\"obj\":\"label\",\"parent\":\"page1\",\"x\":20,\"y\":45,\"text\":\"Interact & observe serial logs. Swipe to change page.\"}");
-          my_sentio->service_run_jsonl("{\"id\":\"lbl_info\",\"text_color\":\"#8B949E\"}");
-          
-          // Interactive button
-          my_sentio->service_run_jsonl("{\"id\":\"btn_press\",\"obj\":\"button\",\"parent\":\"page1\",\"x\":20,\"y\":85,\"w\":180,\"h\":50,\"text\":\"Tap / Hold Me\"}");
-          my_sentio->service_run_jsonl("{\"id\":\"btn_press\",\"bg_color\":\"#21262D\"}");
-          
-          // Slider
-          my_sentio->service_run_jsonl("{\"id\":\"lbl_slider\",\"obj\":\"label\",\"parent\":\"page1\",\"x\":220,\"y\":85,\"text\":\"Drag Slider:\"}");
-          my_sentio->service_run_jsonl("{\"id\":\"lbl_slider\",\"text_color\":\"#8B949E\"}");
-          
-          my_sentio->service_run_jsonl("{\"id\":\"sld_test\",\"obj\":\"slider\",\"parent\":\"page1\",\"x\":220,\"y\":110,\"w\":220,\"h\":25,\"min\":0,\"max\":100,\"value\":60}");
-          
-          // Switch
-          my_sentio->service_run_jsonl("{\"id\":\"lbl_sw\",\"obj\":\"label\",\"parent\":\"page1\",\"x\":20,\"y\":165,\"text\":\"Toggle Switch:\"}");
-          my_sentio->service_run_jsonl("{\"id\":\"lbl_sw\",\"text_color\":\"#8B949E\"}");
-          
-          my_sentio->service_run_jsonl("{\"id\":\"sw_test\",\"obj\":\"switch\",\"parent\":\"page1\",\"x\":20,\"y\":190,\"w\":70,\"h\":35,\"checked\":false}");
-          
-          // Dropdown
-          my_sentio->service_run_jsonl("{\"id\":\"lbl_dd\",\"obj\":\"label\",\"parent\":\"page1\",\"x\":150,\"y\":165,\"text\":\"Select Option:\"}");
-          my_sentio->service_run_jsonl("{\"id\":\"lbl_dd\",\"text_color\":\"#8B949E\"}");
-          
-          my_sentio->service_run_jsonl("{\"id\":\"dd_test\",\"obj\":\"dropdown\",\"parent\":\"page1\",\"x\":150,\"y\":190,\"w\":160,\"h\":40,\"options\":\"Option A\\nOption B\\nOption C\"}");
-          
-          // Sensor-bound label
-          my_sentio->service_run_jsonl("{\"id\":\"lbl_sensor\",\"obj\":\"label\",\"parent\":\"page1\",\"x\":330,\"y\":175,\"text\":\"Temp: ---\"}");
-          my_sentio->service_run_jsonl("{\"id\":\"lbl_sensor\",\"text_color\":\"#58A6FF\"}");
-          my_sentio->service_bind_sensor("lbl_sensor", "my_temp_sensor", "Temp: %.1f \u00b0C");
-          
-          // ── Page 2 Container (initially hidden) ──
-          my_sentio->service_run_jsonl("{\"id\":\"page2\",\"obj\":\"container\",\"hidden\":true}");
-          my_sentio->service_run_jsonl("{\"id\":\"page2\",\"bg_color\":\"#161B22\"}");
-          
-          my_sentio->service_run_jsonl("{\"id\":\"lbl_title2\",\"obj\":\"label\",\"parent\":\"page2\",\"x\":20,\"y\":20,\"text\":\"Page 2: Gesture Navigation Work\"}");
-          my_sentio->service_run_jsonl("{\"id\":\"lbl_title2\",\"text_color\":\"#58A6FF\"}");
-          
-          my_sentio->service_run_jsonl("{\"id\":\"lbl_info2\",\"obj\":\"label\",\"parent\":\"page2\",\"x\":20,\"y\":60,\"text\":\"Swipe right to switch back to Page 1.\"}");
-          my_sentio->service_run_jsonl("{\"id\":\"lbl_info2\",\"text_color\":\"#8B949E\"}");
+  friendly_name: SentIO Touch Test
 
 esp32:
   board: esp32-s3-devkitc-1
@@ -64,7 +12,6 @@ esp32:
     type: arduino
   flash_size: 16MB
 
-# SentIO external component
 external_components:
   - source:
       type: local
@@ -74,7 +21,6 @@ logger:
   level: DEBUG
 
 api:
-  custom_services: true
   encryption:
     key: !secret api_key
 
@@ -86,21 +32,17 @@ wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
 
-# ── SPI bus ──────────────────────────────────────────────────────────────────
+# ── Hardware ──────────────────────────────────────────────────────────────────
 spi:
-  - id: spi_bus
-    clk_pin: GPIO12
-    mosi_pin: GPIO11
-    miso_pin: GPIO13
+  clk_pin: GPIO12
+  mosi_pin: GPIO11
+  miso_pin: GPIO13
 
-# ── I2C (touch controller) ────────────────────────────────────────────────────
 i2c:
-  - id: i2c_bus
-    sda: GPIO4
-    scl: GPIO8
-    scan: true
+  sda: GPIO4
+  scl: GPIO8
+  scan: true
 
-# ── Backlight (PWM output — adjust pin for your board) ────────────────────────
 output:
   - platform: ledc
     id: backlight_pwm
@@ -110,24 +52,20 @@ output:
 light:
   - platform: monochromatic
     id: backlight
-    name: "Display Backlight"
+    name: "Backlight"
     output: backlight_pwm
-    default_transition_length: 500ms  # Smooth fade-in/fade-out on wake/sleep
     restore_mode: ALWAYS_ON
 
-# ── Touchscreen (AXS15231 — internal so LVGL & SentIO both consume it) ────────
 touchscreen:
   - platform: axs15231
     id: my_touch
     display: my_display
     i2c_id: i2c_bus
 
-# ── Display (ST7796 — typical for JC3248W535C) ────────────────────────────────
 display:
   - platform: ili9xxx
     model: ST7796
     id: my_display
-    spi_id: spi_bus
     cs_pin: GPIO10
     dc_pin: GPIO14
     reset_pin: GPIO15
@@ -137,7 +75,7 @@ display:
       height: 320
     update_interval: never
 
-# ── LVGL (base — SentIO layers on top of this) ────────────────────────────────
+# ── LVGL — widgets defined here, no on_boot lambda needed ────────────────────
 lvgl:
   displays:
     - my_display
@@ -145,78 +83,114 @@ lvgl:
     - my_touch
   buffer_size: 25%
 
-# ── Local Sensors (to test SentIO local sensor binding) ──────────────────────
-sensor:
-  - platform: template
-    id: my_temp_sensor
-    name: "Room Temperature"
-    unit_of_measurement: "°C"
-    accuracy_decimals: 1
-    update_interval: 10s
-    lambda: |-
-      return 23.5;
+  widgets:
+    - obj:
+        width: 480
+        height: 320
+        bg_color: 0x0D1117
+        border_width: 0
+        pad_all: 0
+        widgets:
 
-# ── SentIO overlay ────────────────────────────────────────────────────────────
+          # Status label — updated by every touch event
+          - label:
+              id: lbl_status
+              x: 20
+              y: 12
+              text: "Waiting for touch..."
+              text_color: 0x8B949E
+              text_font: MONTSERRAT_16
+
+          # ── TAP / LONG-PRESS button ───────────────────────────────────────
+          - button:
+              id: btn_main
+              x: 20
+              y: 50
+              width: 220
+              height: 80
+              bg_color: 0x21262D
+              border_color: 0x30363D
+              border_width: 1
+              radius: 8
+              widgets:
+                - label:
+                    text: "TAP  or  HOLD ME"
+                    text_color: 0xE6EDF0
+                    align: CENTER
+              on_click:
+                - logger.log: ">>> TAP"
+                - lvgl.label.update:
+                    id: lbl_status
+                    text: "TAP ✓"
+              on_long_press:
+                - logger.log: ">>> LONG PRESS"
+                - lvgl.label.update:
+                    id: lbl_status
+                    text: "LONG PRESS ✓"
+
+          # ── Reset button ──────────────────────────────────────────────────
+          - button:
+              id: btn_reset
+              x: 260
+              y: 50
+              width: 200
+              height: 80
+              bg_color: 0x161B22
+              border_color: 0x30363D
+              border_width: 1
+              radius: 8
+              widgets:
+                - label:
+                    text: "RESET"
+                    text_color: 0x8B949E
+                    align: CENTER
+              on_click:
+                - lvgl.label.update:
+                    id: lbl_status
+                    text: "Waiting for touch..."
+
+          # ── Swipe hint label ──────────────────────────────────────────────
+          - label:
+              x: 20
+              y: 155
+              text: "Swipe anywhere on screen →"
+              text_color: 0x30363D
+              text_font: MONTSERRAT_14
+
+# ── SentIO — handles swipes ───────────────────────────────────────────────────
 sentio:
   id: my_sentio
-  # Optional: link to the touch driver for smart-touch features.
-  # If omitted, SentIO still manages JSONL widgets and backlight.
   touch_source: my_touch
-
-  # Backlight to dim/restore on sleep/wake. Use backlight_light OR backlight_output.
   backlight_light: backlight
-
-  # Dim and black out the screen before the on_sleep trigger fires.
-  # Critical for JC3248W535C: prevents the display from glowing via floating SPI.
-  display_off_before_sleep: true
-
-  # Idle timeout before sleep (adjust to taste)
-  sleep_timeout: 60s
-
-  # First tap after wake does NOT click a widget
+  sleep_timeout: 300s
   suppress_wake_click: true
 
-  # Shift UI ±1 px every 60 s (good for 24/7 wall panels)
-  anti_burn_in: false
-
-  # Load this layout on boot (must be present in LittleFS)
-  # startup_layout: /sentio.jsonl
-
-  # Swipe gesture automations (local, connection-independent)
   on_swipe_left:
-    - lambda: |-
-        auto *my_sentio = esphome::sentio::SentioComponent::instance;
-        my_sentio->service_load_page("page2");
-  on_swipe_right:
-    - lambda: |-
-        auto *my_sentio = esphome::sentio::SentioComponent::instance;
-        my_sentio->service_load_page("page1");
+    - logger.log: ">>> SWIPE LEFT"
+    - lvgl.label.update:
+        id: lbl_status
+        text: "SWIPE LEFT ✓"
 
-  # Page lifecycle event automations (passes page ID as string 'x')
-  on_page_show:
-    - logger.log:
-        format: "SentIO Page Show: %s"
-        args: [ 'x' ]
-  on_page_hide:
-    - logger.log:
-        format: "SentIO Page Hide: %s"
-        args: [ 'x' ]
+  on_swipe_right:
+    - logger.log: ">>> SWIPE RIGHT"
+    - lvgl.label.update:
+        id: lbl_status
+        text: "SWIPE RIGHT ✓"
+
+  on_swipe_up:
+    - logger.log: ">>> SWIPE UP"
+    - lvgl.label.update:
+        id: lbl_status
+        text: "SWIPE UP ✓"
+
+  on_swipe_down:
+    - logger.log: ">>> SWIPE DOWN"
+    - lvgl.label.update:
+        id: lbl_status
+        text: "SWIPE DOWN ✓"
 
   on_sleep:
-    # Option A: just dim — no deep sleep (works on any board)
-    - logger.log: "SentIO: screen sleeping"
-    # Option B: uncomment for deep sleep (JC3248W535C with deep sleep wired)
-    # - deep_sleep.enter:
-    #     sleep_duration: 8h
+    - logger.log: "Screen sleeping"
 
   on_wake:
-    - logger.log: "SentIO: screen woke up"
-    # Fire a sensor refresh when the user picks up the device
-    # - component.update: my_sensor
-
-# ── Example: push a layout from HA on boot via an automation ─────────────────
-# In Home Assistant, call:
-#   service: esphome.sentio_test_sentio_run_jsonl
-#   data:
-#     line: '{"id":"hello","obj":"label","x":100,"y":100,"text":"Hello SentIO!","text_color":"#00FF00"}'
-
+    - logger.log: "Screen woke up"

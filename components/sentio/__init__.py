@@ -127,6 +127,11 @@ async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
 
+    # Ensure the SentIO header is visible to all generated lambdas
+    # (including on_boot: lambdas in the esphome: block that reference
+    #  esphome::sentio::SentioComponent::instance).
+    cg.add_global(cg.RawExpression('#include "esphome/components/sentio/sentio.h"'))
+
     # Touch source (optional smart-touch proxy)
     if CONF_TOUCH_SOURCE in config:
         ts = await cg.get_variable(config[CONF_TOUCH_SOURCE])
