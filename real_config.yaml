@@ -160,20 +160,29 @@ touchscreen:
     display: my_display
     i2c_id: i2c_bus
 
-# ── Display (ST7796 — typical for JC3248W535C) ────────────────────────────────
+# ── Display (AXS15231 QSPI — typical for JC3248W535C) ─────────────────────────
 display:
-  - platform: ili9xxx
-    model: ST7796
+  - platform: mipi_spi
+    model: JC3248W535
     id: my_display
     spi_id: spi_bus
-    cs_pin: GPIO10
-    dc_pin: GPIO14
-    reset_pin: GPIO15
-    invert_colors: false
-    dimensions:
-      width: 480
-      height: 320
+    data_rate: 40MHz
     update_interval: never
+    auto_clear_enabled: false
+
+# display:
+#   - platform: ili9xxx
+#     model: ST7796
+#     id: my_display
+#     spi_id: spi_bus
+#     cs_pin: GPIO10
+#     dc_pin: GPIO14
+#     reset_pin: GPIO15
+#     invert_colors: false
+#     dimensions:
+#       width: 480
+#       height: 320
+#     update_interval: never
 
 # ── LVGL (base — SentIO layers on top of this) ────────────────────────────────
 lvgl:

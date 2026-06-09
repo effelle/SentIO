@@ -158,6 +158,14 @@ class SentioComponent : public Component, public api::CustomAPIDevice {
 #endif
   void bind_sensor(const std::string &widget_id, const std::string &sensor_id, const std::string &format);
 
+  // ── API service methods (also callable from lambdas via ::instance) ───────────
+  void service_run_jsonl(std::string line);
+  void service_clear();
+  void service_load_layout(std::string filename);
+  void service_save_layout_line(std::string line, bool append);
+  void service_bind_sensor(std::string widget_id, std::string sensor_id, std::string format);
+  void service_load_page(std::string page_id);
+
  private:
   // ── Hardware / Component references ───────────────────────────────────────
   touchscreen::Touchscreen *touch_source_{nullptr};
@@ -224,14 +232,6 @@ class SentioComponent : public Component, public api::CustomAPIDevice {
 
   // Color helper
   static lv_color_t parse_hex_color(const char *hex);
-
-  // ── API service methods (registered in setup()) ───────────────────────────
-  void service_run_jsonl(std::string line);
-  void service_clear();
-  void service_load_layout(std::string filename);
-  void service_save_layout_line(std::string line, bool append);
-  void service_bind_sensor(std::string widget_id, std::string sensor_id, std::string format);
-  void service_load_page(std::string page_id);
 };
 
 // ---------------------------------------------------------------------------

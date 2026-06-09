@@ -186,6 +186,10 @@ void SentioComponent::enter_sleep() {
   // Spawn the touch shield so the first wake tap is intercepted safely
   spawn_shield();
 
+  if (soft_sleep_only_ && touch_source_ != nullptr) {
+    touch_source_->stop_poller();
+  }
+
   // Fire the on_sleep automation trigger — user YAML decides what happens
   // (deep_sleep.enter, light.turn_off, nothing, etc.)
   on_sleep_callbacks_.call();
@@ -197,6 +201,10 @@ void SentioComponent::wake_up() {
   last_activity_ms_ = millis();
 
   ESP_LOGI(TAG, "Waking up");
+
+  if (soft_sleep_only_ && touch_source_ != nullptr) {
+    touch_source_->start_poller();
+  }
 
   // Remove the touch-absorbing shield
   destroy_shield();
