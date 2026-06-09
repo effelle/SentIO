@@ -61,6 +61,12 @@ touchscreen:
     id: my_touch
     display: my_display
     i2c_id: i2c_bus
+    on_touch:
+      - lambda: |-
+          ESP_LOGI("touch", "Touch down: x=%d, y=%d", touch.x, touch.y);
+    on_release:
+      - lambda: |-
+          ESP_LOGI("touch", "Touch released");
 
 display:
   - platform: ili9xxx
@@ -71,8 +77,8 @@ display:
     reset_pin: GPIO15
     invert_colors: false
     dimensions:
-      width: 480
-      height: 320
+      width: 320
+      height: 480
     update_interval: never
 
 # ── LVGL — widgets defined here, no on_boot lambda needed ────────────────────
@@ -85,8 +91,8 @@ lvgl:
 
   widgets:
     - obj:
-        width: 480
-        height: 320
+        width: 320
+        height: 480
         bg_color: 0x0D1117
         border_width: 0
         pad_all: 0
@@ -96,7 +102,7 @@ lvgl:
           - label:
               id: lbl_status
               x: 20
-              y: 12
+              y: 20
               text: "Waiting for touch..."
               text_color: 0x8B949E
               text_font: MONTSERRAT_16
@@ -105,9 +111,9 @@ lvgl:
           - button:
               id: btn_main
               x: 20
-              y: 50
-              width: 220
-              height: 80
+              y: 60
+              width: 280
+              height: 100
               bg_color: 0x21262D
               border_color: 0x30363D
               border_width: 1
@@ -131,10 +137,10 @@ lvgl:
           # ── Reset button ──────────────────────────────────────────────────
           - button:
               id: btn_reset
-              x: 260
-              y: 50
-              width: 200
-              height: 80
+              x: 20
+              y: 180
+              width: 280
+              height: 100
               bg_color: 0x161B22
               border_color: 0x30363D
               border_width: 1
@@ -145,6 +151,7 @@ lvgl:
                     text_color: 0x8B949E
                     align: CENTER
               on_click:
+                - logger.log: ">>> RESET"
                 - lvgl.label.update:
                     id: lbl_status
                     text: "Waiting for touch..."
@@ -152,7 +159,7 @@ lvgl:
           # ── Swipe hint label ──────────────────────────────────────────────
           - label:
               x: 20
-              y: 155
+              y: 300
               text: "Swipe anywhere on screen →"
               text_color: 0x30363D
               text_font: MONTSERRAT_14
