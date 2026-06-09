@@ -12,6 +12,10 @@
 namespace esphome {
 namespace sentio {
 
+// Static singleton — set in setup() so lambdas in on_boot can reach us
+// without relying on ESPHome's generated ID variable.
+SentioComponent *SentioComponent::instance = nullptr;
+
 static const char *const TAG = "sentio";
 
 // Swipe threshold in pixels before a drag is classified as a swipe
@@ -69,6 +73,7 @@ static void sentio_gesture_event_cb(lv_event_t *e) {
 
 void SentioComponent::setup() {
   ESP_LOGI(TAG, "SentIO setup — LVGL overlay starting");
+  instance = this;
 
   last_activity_ms_ = millis();
 

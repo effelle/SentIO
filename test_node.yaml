@@ -9,6 +9,7 @@ esphome:
     priority: -100.0  # Runs after setup completes (LATE - 100)
     then:
       - lambda: |-
+          auto *my_sentio = esphome::sentio::SentioComponent::instance;
           // Create page 1 container
           my_sentio->service_run_jsonl("{\"id\":\"page1\",\"obj\":\"container\",\"hidden\":false}");
           my_sentio->service_run_jsonl("{\"id\":\"page1\",\"bg_color\":\"#0D1117\"}");
@@ -45,7 +46,7 @@ esphome:
           // Sensor-bound label
           my_sentio->service_run_jsonl("{\"id\":\"lbl_sensor\",\"obj\":\"label\",\"parent\":\"page1\",\"x\":330,\"y\":175,\"text\":\"Temp: ---\"}");
           my_sentio->service_run_jsonl("{\"id\":\"lbl_sensor\",\"text_color\":\"#58A6FF\"}");
-          my_sentio->service_bind_sensor("lbl_sensor", "my_temp_sensor", "Temp: %.1f °C");
+          my_sentio->service_bind_sensor("lbl_sensor", "my_temp_sensor", "Temp: %.1f \u00b0C");
           
           // ── Page 2 Container (initially hidden) ──
           my_sentio->service_run_jsonl("{\"id\":\"page2\",\"obj\":\"container\",\"hidden\":true}");
@@ -184,9 +185,11 @@ sentio:
   # Swipe gesture automations (local, connection-independent)
   on_swipe_left:
     - lambda: |-
+        auto *my_sentio = esphome::sentio::SentioComponent::instance;
         my_sentio->service_load_page("page2");
   on_swipe_right:
     - lambda: |-
+        auto *my_sentio = esphome::sentio::SentioComponent::instance;
         my_sentio->service_load_page("page1");
 
   # Page lifecycle event automations (passes page ID as string 'x')

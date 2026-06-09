@@ -93,6 +93,8 @@ class PageHideTrigger : public Trigger<std::string> {
 // ---------------------------------------------------------------------------
 class SentioComponent : public Component, public api::CustomAPIDevice {
  public:
+  static SentioComponent *instance;
+
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   void setup()       override;
   void loop()        override;
