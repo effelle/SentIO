@@ -4,11 +4,11 @@
 #include "esphome/core/helpers.h"
 #include "esphome/core/log.h"
 #include "esphome/core/automation.h"
-#include "esphome/core/json_util.h"
 #include "esphome/components/api/custom_api_device.h"
 #include "esphome/components/touchscreen/touchscreen.h"
 #include "esphome/components/light/light_state.h"
 #include "esphome/components/output/float_output.h"
+// json_util is included in sentio.cpp only (not needed in the header)
 
 #include "lvgl.h"
 

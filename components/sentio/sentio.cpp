@@ -2,6 +2,7 @@
 
 #include "esphome/core/log.h"
 #include "esphome/core/application.h"
+#include "esphome/components/json/json_util.h"
 
 // LittleFS — Arduino framework only (IDF path is a Phase 4 enhancement)
 #ifdef USE_ARDUINO
