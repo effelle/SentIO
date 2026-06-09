@@ -93,9 +93,10 @@ void SentioComponent::setup() {
   lv_obj_set_style_border_width(root_container_, 0, LV_PART_MAIN);
   lv_obj_set_style_pad_all(root_container_, 0, LV_PART_MAIN);
   lv_obj_clear_flag(root_container_, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_clear_flag(root_container_, LV_OBJ_FLAG_CLICKABLE);
 
-  // Register swipe gesture handler on the root container
-  lv_obj_add_event_cb(root_container_, sentio_gesture_event_cb, LV_EVENT_GESTURE, this);
+  // Register swipe gesture handler on the active screen
+  lv_obj_add_event_cb(lv_scr_act(), sentio_gesture_event_cb, LV_EVENT_GESTURE, this);
 
   // Register HA API services
   register_service(&SentioComponent::service_run_jsonl,
