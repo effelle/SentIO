@@ -13,6 +13,7 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome import automation
 from esphome.components import light, output, touchscreen
+from esphome.components.lvgl.helpers import add_lv_use
 from esphome.const import CONF_ID, CONF_TRIGGER_ID
 
 CODEOWNERS = ["@effelle"]
@@ -126,6 +127,30 @@ CONFIG_SCHEMA = cv.Schema({
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
+
+    # ── Auto-enable API custom service registration ───────────────────────────
+    # SentioComponent calls register_service() which requires these two defines.
+    # Setting them here means the user does NOT need custom_services: true in YAML.
+    cg.add_define("USE_API_USER_DEFINED_ACTIONS")
+    cg.add_define("USE_API_CUSTOM_SERVICES")
+
+    # ── Register all LVGL widget types used by the sentio JSONL engine ────────
+    # Each entry corresponds to a lv_<widget>_create() call in create_widget().
+    # Without these, the LVGL build system strips the widget source files.
+    add_lv_use(
+        "OBJ",
+        "LABEL",
+        "BTN",
+        "SLIDER",
+        "SWITCH",
+        "CHECKBOX",
+        "DROPDOWN",
+        "TEXTAREA",
+        "ARC",
+        "BAR",
+        "IMG",
+        "SPINNER",
+    )
 
     # Touch source (optional smart-touch proxy)
     if CONF_TOUCH_SOURCE in config:
