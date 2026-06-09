@@ -172,7 +172,9 @@ void SentioComponent::enter_sleep() {
 
   // Pause all LVGL timers — stops animations from running on a dark screen
   // and reduces ESP32 CPU load significantly while sleeping.
-  lv_timer_pause(burn_in_timer_); // Safe even if null
+  if (burn_in_timer_ != nullptr) {
+    lv_timer_pause(burn_in_timer_);
+  }
   // Note: lv_timer_pause_all() pauses ALL timers including LVGL internals.
   // We pause only our own timer here; the user can pause more via on_sleep.
 
