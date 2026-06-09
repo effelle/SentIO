@@ -314,7 +314,7 @@ void SentioComponent::service_save_layout_line(std::string line, bool append) {
 void SentioComponent::parse_jsonl_line(const std::string &line) {
   bool ok = json::parse_json(line, [&](JsonObject root) -> bool {
     // Every valid line must have an "id" field
-    if (!root.containsKey("id")) {
+    if (!root["id"].is<JsonVariant>()) {
       ESP_LOGW(TAG, "JSONL line missing 'id' field: %s", line.c_str());
       return false;
     }
@@ -322,7 +322,7 @@ void SentioComponent::parse_jsonl_line(const std::string &line) {
     std::string id = root["id"].as<std::string>();
 
     // Delete command: {"id": "my_widget", "delete": true}
-    if (root.containsKey("delete") && root["delete"].as<bool>()) {
+    if (root["delete"].is<bool>() && root["delete"].as<bool>()) {
       auto it = widgets_.find(id);
       if (it != widgets_.end()) {
         lv_obj_del(it->second);
@@ -334,7 +334,7 @@ void SentioComponent::parse_jsonl_line(const std::string &line) {
 
     lv_obj_t *obj = nullptr;
 
-    if (root.containsKey("obj")) {
+    if (root["obj"].is<JsonVariant>()) {
       // Creation mode: widget does not yet exist (or we replace it)
       std::string type = root["obj"].as<std::string>();
       auto it = widgets_.find(id);
@@ -379,14 +379,14 @@ lv_obj_t *SentioComponent::create_widget(const std::string &type, lv_obj_t *pare
   if (type == "label")                      return lv_label_create(parent);
   if (type == "button" || type == "btn")    return lv_button_create(parent);  // LVGL v9
   if (type == "slider")                     return lv_slider_create(parent);
-#ifdef LV_USE_SWITCH
+#if LV_USE_SWITCH
   if (type == "switch" || type == "sw")     return lv_switch_create(parent);
 #endif
   if (type == "checkbox" || type == "cb")   return lv_checkbox_create(parent);
-#ifdef LV_USE_DROPDOWN
+#if LV_USE_DROPDOWN
   if (type == "dropdown" || type == "dd")   return lv_dropdown_create(parent);
 #endif
-#ifdef LV_USE_TEXTAREA
+#if LV_USE_TEXTAREA
   if (type == "textarea" || type == "ta")   return lv_textarea_create(parent);
 #endif
   if (type == "arc")                        return lv_arc_create(parent);
@@ -534,7 +534,7 @@ void SentioComponent::apply_properties(lv_obj_t *obj, JsonObject props) {
   }
 
   // ── Dropdown options ───────────────────────────────────────────────────
-#ifdef LV_USE_DROPDOWN
+#if LV_USE_DROPDOWN
   if (props["options"].is<const char *>() && lv_obj_check_type(obj, &lv_dropdown_class)) {
     lv_dropdown_set_options(obj, props["options"].as<const char *>());
   }
@@ -565,7 +565,7 @@ void SentioComponent::register_widget_events(lv_obj_t *obj, const std::string &i
 
 void SentioComponent::handle_widget_event(lv_event_t *e, const std::string &widget_id) {
   lv_event_code_t code = lv_event_get_code(e);
-  lv_obj_t *obj        = lv_event_get_target(e);
+  lv_obj_t *obj        = static_cast<lv_obj_t *>(lv_event_get_target(e));
 
   std::string event_type;
   std::string value_str;
@@ -584,11 +584,11 @@ void SentioComponent::handle_widget_event(lv_event_t *e, const std::string &widg
       value_str = to_string(lv_slider_get_value(obj));
     } else if (lv_obj_check_type(obj, &lv_arc_class)) {
       value_str = to_string(lv_arc_get_value(obj));
-#ifdef LV_USE_SWITCH
+#if LV_USE_SWITCH
     } else if (lv_obj_check_type(obj, &lv_switch_class)) {
       value_str = lv_obj_has_state(obj, LV_STATE_CHECKED) ? "true" : "false";
 #endif
-#ifdef LV_USE_DROPDOWN
+#if LV_USE_DROPDOWN
     } else if (lv_obj_check_type(obj, &lv_dropdown_class)) {
       char buf[64] = {0};
       lv_dropdown_get_selected_str(obj, buf, sizeof(buf));
