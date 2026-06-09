@@ -171,6 +171,7 @@ sentio:
   backlight_light: backlight
   sleep_timeout: 300s
   suppress_wake_click: true
+  soft_sleep_only: false
 
   on_swipe_left:
     - logger.log: ">>> SWIPE LEFT"
