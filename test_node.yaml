@@ -1,0 +1,166 @@
+# test_node.yaml — SentIO development test node
+# Target board: JC3248W535C_I_Y (ESP32-S3, ST7796 display, GT911 touch)
+# Adjust pins to match your specific wiring.
+
+esphome:
+  name: sentio-test
+  friendly_name: SentIO Test Node
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: arduino
+  flash_size: 16MB
+
+# SentIO external component
+external_components:
+  - source:
+      type: local
+      path: external_components
+
+logger:
+  level: DEBUG
+
+api:
+  encryption:
+    key: !secret api_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+# ── SPI bus ──────────────────────────────────────────────────────────────────
+spi:
+  - id: spi_bus
+    clk_pin: GPIO12
+    mosi_pin: GPIO11
+    miso_pin: GPIO13
+
+# ── I2C (touch controller) ────────────────────────────────────────────────────
+i2c:
+  - id: i2c_bus
+    sda: GPIO8
+    scl: GPIO9
+    scan: false
+
+# ── Backlight (PWM output — adjust pin for your board) ────────────────────────
+output:
+  - platform: ledc
+    id: backlight_pwm
+    pin: GPIO38
+    frequency: 1000Hz
+
+light:
+  - platform: monochromatic
+    id: backlight
+    name: "Display Backlight"
+    output: backlight_pwm
+    default_transition_length: 500ms  # Smooth fade-in/fade-out on wake/sleep
+    restore_mode: ALWAYS_ON
+
+# ── Touchscreen (GT911 — internal so LVGL & SentIO both consume it) ───────────
+touchscreen:
+  - platform: gt911
+    id: my_touch
+    display: my_display
+    i2c_id: i2c_bus
+    # interrupt_pin: GPIO4  # Optional — improves responsiveness
+    # reset_pin:     GPIO5  # Required for CST816; optional for GT911
+
+# ── Display (ST7796 — typical for JC3248W535C) ────────────────────────────────
+display:
+  - platform: ili9xxx
+    model: ST7796
+    id: my_display
+    spi_id: spi_bus
+    cs_pin: GPIO10
+    dc_pin: GPIO14
+    reset_pin: GPIO15
+    invert_colors: false
+    dimensions:
+      width: 480
+      height: 320
+    update_interval: never
+
+# ── LVGL (base — SentIO layers on top of this) ────────────────────────────────
+lvgl:
+  displays:
+    - my_display
+  touchscreens:
+    - my_touch
+  buffer_size: 25%
+
+# ── Local Sensors (to test SentIO local sensor binding) ──────────────────────
+sensor:
+  - platform: template
+    id: my_temp_sensor
+    name: "Room Temperature"
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+    update_interval: 10s
+    lambda: |-
+      return 23.5;
+
+# ── SentIO overlay ────────────────────────────────────────────────────────────
+sentio:
+  # Optional: link to the touch driver for smart-touch features.
+  # If omitted, SentIO still manages JSONL widgets and backlight.
+  touch_source: my_touch
+
+  # Backlight to dim/restore on sleep/wake. Use backlight_light OR backlight_output.
+  backlight_light: backlight
+
+  # Dim and black out the screen before the on_sleep trigger fires.
+  # Critical for JC3248W535C: prevents the display from glowing via floating SPI.
+  display_off_before_sleep: true
+
+  # Idle timeout before sleep (adjust to taste)
+  sleep_timeout: 60s
+
+  # First tap after wake does NOT click a widget
+  suppress_wake_click: true
+
+  # Shift UI ±1 px every 60 s (good for 24/7 wall panels)
+  anti_burn_in: false
+
+  # Load this layout on boot (must be present in LittleFS)
+  # startup_layout: /sentio.jsonl
+
+  # Swipe gesture automations (local, connection-independent)
+  on_swipe_left:
+    - logger.log: "SentIO gesture: swiped left!"
+  on_swipe_right:
+    - logger.log: "SentIO gesture: swiped right!"
+
+  # Page lifecycle event automations (passes page ID as string 'x')
+  on_page_show:
+    - logger.log:
+        format: "SentIO Page Show: %s"
+        args: [ 'x' ]
+  on_page_hide:
+    - logger.log:
+        format: "SentIO Page Hide: %s"
+        args: [ 'x' ]
+
+  on_sleep:
+    # Option A: just dim — no deep sleep (works on any board)
+    - logger.log: "SentIO: screen sleeping"
+    # Option B: uncomment for deep sleep (JC3248W535C with deep sleep wired)
+    # - deep_sleep.enter:
+    #     sleep_duration: 8h
+
+  on_wake:
+    - logger.log: "SentIO: screen woke up"
+    # Fire a sensor refresh when the user picks up the device
+    # - component.update: my_sensor
+
+# ── Example: push a layout from HA on boot via an automation ─────────────────
+# In Home Assistant, call:
+#   service: esphome.sentio_test_sentio_run_jsonl
+#   data:
+#     line: '{"id":"hello","obj":"label","x":100,"y":100,"text":"Hello SentIO!","text_color":"#00FF00"}'
+
