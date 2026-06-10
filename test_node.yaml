@@ -81,6 +81,12 @@ display:
       height: 480
     update_interval: never
 
+# ── Globals ───────────────────────────────────────────────────────────────────
+globals:
+  - id: g_long_pressed
+    type: bool
+    initial_value: 'false'
+
 # ── LVGL — widgets defined here, no on_boot lambda needed ────────────────────
 lvgl:
   displays:
@@ -124,11 +130,21 @@ lvgl:
                     text_color: 0xE6EDF0
                     align: CENTER
               on_click:
-                - logger.log: ">>> TAP"
-                - lvgl.label.update:
-                    id: lbl_status
-                    text: "TAP ✓"
+                - if:
+                    condition:
+                      lambda: 'return !id(g_long_pressed);'
+                    then:
+                      - logger.log: ">>> TAP"
+                      - lvgl.label.update:
+                          id: lbl_status
+                          text: "TAP ✓"
+                - globals.set:
+                    id: g_long_pressed
+                    value: 'false'
               on_long_press:
+                - globals.set:
+                    id: g_long_pressed
+                    value: 'true'
                 - logger.log: ">>> LONG PRESS"
                 - lvgl.label.update:
                     id: lbl_status
