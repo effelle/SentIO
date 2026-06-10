@@ -170,6 +170,9 @@ class SentioComponent : public Component, public api::CustomAPIDevice {
   void service_save_layout_line(std::string line, bool append);
   void service_bind_sensor(std::string widget_id, std::string sensor_id, std::string format);
   void service_load_page(std::string page_id);
+  void service_set_bg_image(std::string widget_id, std::string path);
+
+  std::string get_active_page_id() const { return active_page_id_; }
 
  private:
   // ── Hardware / Component references ───────────────────────────────────────
@@ -284,6 +287,20 @@ inline PageShowTrigger::PageShowTrigger(SentioComponent *parent) {
 inline PageHideTrigger::PageHideTrigger(SentioComponent *parent) {
   parent->add_on_page_hide_callback([this](std::string page_id) { this->trigger(page_id); });
 }
+
+// ---------------------------------------------------------------------------
+// IsPageCondition
+// ---------------------------------------------------------------------------
+template<typename... Ts>
+class IsPageCondition : public Condition<Ts...>, public Parented<SentioComponent> {
+ public:
+  void set_page_id(const std::string &page_id) { page_id_ = page_id; }
+  bool check(Ts... x) override {
+    return this->parent_->get_active_page_id() == this->page_id_;
+  }
+ protected:
+  std::string page_id_;
+};
 
 }  // namespace sentio
 }  // namespace esphome

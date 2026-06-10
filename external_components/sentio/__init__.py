@@ -38,6 +38,8 @@ SwipeDownTrigger  = sentio_ns.class_("SwipeDownTrigger",  automation.Trigger.tem
 PageShowTrigger   = sentio_ns.class_("PageShowTrigger",   automation.Trigger.template(cg.std_string))
 PageHideTrigger   = sentio_ns.class_("PageHideTrigger",   automation.Trigger.template(cg.std_string))
 
+IsPageCondition   = sentio_ns.class_("IsPageCondition",   automation.Condition)
+
 # ---------------------------------------------------------------------------
 # YAML configuration key constants
 # ---------------------------------------------------------------------------
@@ -61,6 +63,7 @@ CONF_ON_SWIPE_UP              = "on_swipe_up"
 CONF_ON_SWIPE_DOWN            = "on_swipe_down"
 CONF_ON_PAGE_SHOW             = "on_page_show"
 CONF_ON_PAGE_HIDE             = "on_page_hide"
+CONF_PAGE_ID                  = "page_id"
 
 # ---------------------------------------------------------------------------
 # Schema
@@ -135,6 +138,25 @@ CONFIG_SCHEMA = cv.Schema({
         cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(PageHideTrigger),
     }),
 }).extend(cv.COMPONENT_SCHEMA)
+
+
+@automation.register_condition(
+    "sentio.is_page",
+    IsPageCondition,
+    cv.maybe_simple_value(
+        {
+            cv.GenerateID(): cv.use_id(SentioComponent),
+            cv.Required(CONF_PAGE_ID): cv.string,
+        },
+        key=CONF_PAGE_ID,
+    ),
+)
+async def sentio_is_page_to_code(config, condition_id, template_arg, args):
+    var = cg.new_Pvariable(condition_id, template_arg)
+    await cg.register_parented(var, config[CONF_ID])
+    cg.add(var.set_page_id(config[CONF_PAGE_ID]))
+    return var
+
 
 # ---------------------------------------------------------------------------
 # Code generator

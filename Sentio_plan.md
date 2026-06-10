@@ -188,13 +188,13 @@ SentIO/
 
 ### Phase 6: Sensor Binding & Data Helpers
 ```
-[ ] Task 6.1: sensor_label_bind
+[x] Task 6.1: sensor_label_bind
     Register sentio_bind_sensor(widget_id: string, sensor_id: string, format: string) service.
     Internally subscribes to the sensor state and auto-updates the LVGL label text on change.
     Supports printf-style format strings (e.g., "%.1f°C").
     - Verify: Confirm subscription callback fires and label updates without flicker.
 
-[ ] Task 6.2: bg_image_service
+[x] Task 6.2: bg_image_service
     Register sentio_set_bg_image(widget_id: string, path: string) service.
     Loads image from LittleFS, calls lv_img_set_src, then lv_obj_invalidate on parent only.
     Avoids full-screen redraw flicker caused by naive background switching.
@@ -203,12 +203,12 @@ SentIO/
 
 ### Phase 7: Page Lifecycle Events
 ```
-[ ] Task 7.1: page_lifecycle_triggers
+[x] Task 7.1: page_lifecycle_triggers
     When sentio_load_page(id) is called, fire on_hide for the previous page root widget
     and on_show for the new one. Expose as YAML automation triggers.
     - Verify: Confirm trigger order: on_hide fires before lv_scr_load, on_show fires after.
 
-[ ] Task 7.2: is_page_condition
+[x] Task 7.2: is_page_condition
     Implement sentio.is_page YAML condition that returns true when the named page
     is the currently active LVGL screen. Allows conditional top_layer widget visibility.
     - Verify: Condition evaluates correctly after rapid page transitions.

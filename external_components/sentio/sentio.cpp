@@ -31,6 +31,74 @@ static constexpr int16_t SWIPE_THRESHOLD = 30;
 // Static LVGL callbacks (must be free functions — no captures allowed)
 // ---------------------------------------------------------------------------
 
+// Static filesystem driver
+static lv_fs_drv_t sentio_fs_drv;
+
+static void *sentio_fs_open(lv_fs_drv_t *drv, const char *path, lv_fs_mode_t mode) {
+  const char *mode_str = (mode == LV_FS_MODE_WR) ? "w" : "r";
+  std::string full_path = path;
+  
+  if (full_path.rfind("/littlefs", 0) != 0) {
+    if (full_path.empty() || full_path[0] != '/') {
+      full_path = "/littlefs/" + full_path;
+    } else {
+      full_path = "/littlefs" + full_path;
+    }
+  }
+  
+  FILE *f = fopen(full_path.c_str(), mode_str);
+  return (void *)f;
+}
+
+static lv_fs_res_t sentio_fs_close(lv_fs_drv_t *drv, void *file_p) {
+  FILE *f = static_cast<FILE *>(file_p);
+  if (f != nullptr) {
+    fclose(f);
+  }
+  return LV_FS_RES_OK;
+}
+
+static lv_fs_res_t sentio_fs_read(lv_fs_drv_t *drv, void *file_p, void *buf, uint32_t btr, uint32_t *br) {
+  FILE *f = static_cast<FILE *>(file_p);
+  if (f == nullptr) return LV_FS_RES_HW_ERR;
+  size_t read_bytes = fread(buf, 1, btr, f);
+  if (br != nullptr) {
+    *br = read_bytes;
+  }
+  return LV_FS_RES_OK;
+}
+
+static lv_fs_res_t sentio_fs_write(lv_fs_drv_t *drv, void *file_p, const void *buf, uint32_t btw, uint32_t *bw) {
+  FILE *f = static_cast<FILE *>(file_p);
+  if (f == nullptr) return LV_FS_RES_HW_ERR;
+  size_t written_bytes = fwrite(buf, 1, btw, f);
+  if (bw != nullptr) {
+    *bw = written_bytes;
+  }
+  return LV_FS_RES_OK;
+}
+
+static lv_fs_res_t sentio_fs_seek(lv_fs_drv_t *drv, void *file_p, uint32_t pos, lv_fs_whence_t whence) {
+  FILE *f = static_cast<FILE *>(file_p);
+  if (f == nullptr) return LV_FS_RES_HW_ERR;
+  int w = SEEK_SET;
+  if (whence == LV_FS_SEEK_CUR) w = SEEK_CUR;
+  else if (whence == LV_FS_SEEK_END) w = SEEK_END;
+  if (fseek(f, pos, w) != 0) return LV_FS_RES_HW_ERR;
+  return LV_FS_RES_OK;
+}
+
+static lv_fs_res_t sentio_fs_tell(lv_fs_drv_t *drv, void *file_p, uint32_t *pos_p) {
+  FILE *f = static_cast<FILE *>(file_p);
+  if (f == nullptr) return LV_FS_RES_HW_ERR;
+  long pos = ftell(f);
+  if (pos < 0) return LV_FS_RES_HW_ERR;
+  if (pos_p != nullptr) {
+    *pos_p = static_cast<uint32_t>(pos);
+  }
+  return LV_FS_RES_OK;
+}
+
 // Called for every interactive widget event (click, value change, etc.)
 static void sentio_widget_event_cb(lv_event_t *e) {
   auto *data = static_cast<WidgetEventData *>(lv_event_get_user_data(e));
@@ -108,6 +176,19 @@ void SentioComponent::setup() {
                    "sentio_bind_sensor", {"widget_id", "sensor_id", "format"});
   register_service(&SentioComponent::service_load_page,
                    "sentio_load_page", {"page_id"});
+  register_service(&SentioComponent::service_set_bg_image,
+                   "sentio_set_bg_image", {"widget_id", "path"});
+
+  // Initialize and register LittleFS driver for LVGL
+  lv_fs_drv_init(&sentio_fs_drv);
+  sentio_fs_drv.letter = 'L';
+  sentio_fs_drv.open_cb = sentio_fs_open;
+  sentio_fs_drv.close_cb = sentio_fs_close;
+  sentio_fs_drv.read_cb = sentio_fs_read;
+  sentio_fs_drv.write_cb = sentio_fs_write;
+  sentio_fs_drv.seek_cb = sentio_fs_seek;
+  sentio_fs_drv.tell_cb = sentio_fs_tell;
+  lv_fs_drv_register(&sentio_fs_drv);
 
   // Burn-in protection timer (fires every 60 seconds)
   if (anti_burn_in_) {
@@ -312,7 +393,24 @@ void SentioComponent::service_save_layout_line(std::string line, bool append) {
   f.println(line.c_str());
   f.close();
 #else
-  ESP_LOGW(TAG, "save_layout_line: LittleFS write not yet implemented for IDF framework");
+  // ESP-IDF path using POSIX FILE API
+  std::string file_path = startup_layout_.empty() ? "/littlefs/sentio.jsonl" : startup_layout_;
+  // Fallback prefix check
+  if (file_path.rfind("/littlefs", 0) != 0) {
+    if (file_path.empty() || file_path[0] != '/') {
+      file_path = "/littlefs/" + file_path;
+    } else {
+      file_path = "/littlefs" + file_path;
+    }
+  }
+  const char *mode = append ? "a" : "w";
+  FILE *f = fopen(file_path.c_str(), mode);
+  if (f == nullptr) {
+    ESP_LOGE(TAG, "Cannot open layout file '%s' for writing", file_path.c_str());
+    return;
+  }
+  fprintf(f, "%s\n", line.c_str());
+  fclose(f);
 #endif
 }
 
@@ -736,7 +834,42 @@ void SentioComponent::load_layout_from_file(const std::string &path) {
   }
   f.close();
 #else
-  ESP_LOGW(TAG, "load_layout_from_file: IDF LittleFS not yet implemented");
+  // POSIX file read for ESP-IDF
+  FILE *f = fopen(path.c_str(), "r");
+  if (f == nullptr) {
+    std::string fallback_path = path;
+    if (fallback_path.empty() || fallback_path[0] != '/') {
+      fallback_path = "/" + fallback_path;
+    }
+    fallback_path = "/littlefs" + fallback_path;
+    f = fopen(fallback_path.c_str(), "r");
+    if (f == nullptr) {
+      ESP_LOGW(TAG, "Layout file not found (tried '%s' and '%s')", path.c_str(), fallback_path.c_str());
+      return;
+    }
+    ESP_LOGI(TAG, "Loading layout from %s", fallback_path.c_str());
+  } else {
+    ESP_LOGI(TAG, "Loading layout from %s", path.c_str());
+  }
+
+  char buf[256];
+  while (fgets(buf, sizeof(buf), f) != nullptr) {
+    std::string raw_line(buf);
+    while (!raw_line.empty() && (raw_line.back() == '\n' || raw_line.back() == '\r')) {
+      raw_line.pop_back();
+    }
+    size_t first = raw_line.find_first_not_of(" \t");
+    size_t last = raw_line.find_last_not_of(" \t");
+    if (first != std::string::npos && last != std::string::npos) {
+      raw_line = raw_line.substr(first, (last - first + 1));
+    } else {
+      raw_line.clear();
+    }
+    if (raw_line.length() > 2) {
+      parse_jsonl_line(raw_line);
+    }
+  }
+  fclose(f);
 #endif
 }
 
@@ -868,6 +1001,46 @@ void SentioComponent::bind_sensor(const std::string &widget_id, const std::strin
 
 void SentioComponent::service_bind_sensor(std::string widget_id, std::string sensor_id, std::string format) {
   this->bind_sensor(widget_id, sensor_id, format);
+}
+
+void SentioComponent::service_set_bg_image(std::string widget_id, std::string path) {
+  auto it = this->widgets_.find(widget_id);
+  if (it == this->widgets_.end() || it->second == nullptr) {
+    ESP_LOGW(TAG, "set_bg_image: widget '%s' not found", widget_id.c_str());
+    return;
+  }
+  lv_obj_t *obj = it->second;
+  
+  std::string lvgl_path = path;
+  if (lvgl_path.rfind("L:", 0) != 0) {
+    if (!lvgl_path.empty() && lvgl_path[0] == '/') {
+      lvgl_path = "L:" + lvgl_path;
+    } else {
+      lvgl_path = "L:/" + lvgl_path;
+    }
+  }
+
+  ESP_LOGD(TAG, "Setting background image of widget '%s' to '%s'", widget_id.c_str(), lvgl_path.c_str());
+
+#if LV_USE_IMG || LV_USE_IMAGE
+#  if LVGL_VERSION_MAJOR >= 9
+  if (lv_obj_check_type(obj, &lv_image_class)) {
+    lv_image_set_src(obj, lvgl_path.c_str());
+    lv_obj_invalidate(lv_obj_get_parent(obj));
+  } else {
+    ESP_LOGW(TAG, "set_bg_image: widget '%s' is not an image widget", widget_id.c_str());
+  }
+#  else
+  if (lv_obj_check_type(obj, &lv_img_class)) {
+    lv_img_set_src(obj, lvgl_path.c_str());
+    lv_obj_invalidate(lv_obj_get_parent(obj));
+  } else {
+    ESP_LOGW(TAG, "set_bg_image: widget '%s' is not an image widget", widget_id.c_str());
+  }
+#  endif
+#else
+  ESP_LOGW(TAG, "set_bg_image: image/img component is not enabled in this build");
+#endif
 }
 
 void SentioComponent::service_load_page(std::string page_id) {
