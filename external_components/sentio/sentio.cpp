@@ -1160,17 +1160,28 @@ void SentioComponent::handle_indev_read(lv_indev_t *indev, lv_indev_data_t *data
     }
   } else {
     // Finger released (LV_INDEV_STATE_REL)
-    if (this->touch_state_ == TouchState::LONG_PRESS) {
-      // Suppress release click by placing coordinate out-of-bounds
+    if (this->touch_state_ == TouchState::LONG_PRESS || this->touch_state_ == TouchState::SWIPE) {
+      int32_t hor_res = 320;
+      int32_t ver_res = 240;
+#if LVGL_VERSION_MAJOR >= 9
+      lv_display_t *disp = lv_display_get_default();
+      if (disp != nullptr) {
+        hor_res = lv_display_get_horizontal_resolution(disp);
+        ver_res = lv_display_get_vertical_resolution(disp);
+      }
+#else
+      lv_disp_t *disp = lv_disp_get_default();
+      if (disp != nullptr) {
+        hor_res = lv_disp_get_hor_res(disp);
+        ver_res = lv_disp_get_ver_res(disp);
+      }
+#endif
       data->state = LV_INDEV_STATE_REL;
-      data->point.x = -1000;
-      data->point.y = -1000;
-      ESP_LOGD(TAG, "Suppressing click after long press");
-    } else if (this->touch_state_ == TouchState::SWIPE) {
-      // Suppress release click for swipe
-      data->state = LV_INDEV_STATE_REL;
-      data->point.x = -1000;
-      data->point.y = -1000;
+      data->point.x = (this->touch_start_x_ < hor_res / 2) ? hor_res - 1 : 0;
+      data->point.y = (this->touch_start_y_ < ver_res / 2) ? ver_res - 1 : 0;
+      if (this->touch_state_ == TouchState::LONG_PRESS) {
+        ESP_LOGD(TAG, "Suppressing click after long press");
+      }
     }
     this->touch_state_ = TouchState::IDLE;
     this->ignore_wake_tap_ = false;
@@ -1178,9 +1189,24 @@ void SentioComponent::handle_indev_read(lv_indev_t *indev, lv_indev_data_t *data
 
   // Force suppress coordinates if currently in SWIPE state
   if (this->touch_state_ == TouchState::SWIPE) {
+    int32_t hor_res = 320;
+    int32_t ver_res = 240;
+#if LVGL_VERSION_MAJOR >= 9
+    lv_display_t *disp = lv_display_get_default();
+    if (disp != nullptr) {
+      hor_res = lv_display_get_horizontal_resolution(disp);
+      ver_res = lv_display_get_vertical_resolution(disp);
+    }
+#else
+    lv_disp_t *disp = lv_disp_get_default();
+    if (disp != nullptr) {
+      hor_res = lv_disp_get_hor_res(disp);
+      ver_res = lv_disp_get_ver_res(disp);
+    }
+#endif
     data->state = LV_INDEV_STATE_REL;
-    data->point.x = -1000;
-    data->point.y = -1000;
+    data->point.x = (this->touch_start_x_ < hor_res / 2) ? hor_res - 1 : 0;
+    data->point.y = (this->touch_start_y_ < ver_res / 2) ? ver_res - 1 : 0;
   }
 }
 
