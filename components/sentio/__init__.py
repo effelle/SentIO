@@ -52,6 +52,7 @@ CONF_STARTUP_LAYOUT           = "startup_layout"
 CONF_SOFT_SLEEP_ONLY          = "soft_sleep_only"
 CONF_GESTURE_THRESHOLD        = "gesture_threshold"
 CONF_GESTURE_TIMEOUT          = "gesture_timeout"
+CONF_LONG_PRESS_TIME          = "long_press_time"
 CONF_ON_SLEEP                 = "on_sleep"
 CONF_ON_WAKE                  = "on_wake"
 CONF_ON_SWIPE_LEFT            = "on_swipe_left"
@@ -102,6 +103,10 @@ CONFIG_SCHEMA = cv.Schema({
     # a tap/long-press and gesture detection is locked out (default 300 ms).
     # Set this lower than your long_press threshold to prevent drift-swipes.
     cv.Optional(CONF_GESTURE_TIMEOUT, default="300ms"):
+        cv.positive_time_period_milliseconds,
+    # long_press_time: time in ms a touch must be held to register as a long press.
+    # When released after a long press, SentIO suppresses the clicked event.
+    cv.Optional(CONF_LONG_PRESS_TIME, default="500ms"):
         cv.positive_time_period_milliseconds,
 
     # Automation triggers
@@ -182,9 +187,10 @@ async def to_code(config):
     if config[CONF_STARTUP_LAYOUT]:
         cg.add(var.set_startup_layout(config[CONF_STARTUP_LAYOUT]))
 
-    # Gesture tuning
+    # Gesture & Input tuning
     cg.add(var.set_gesture_threshold(config[CONF_GESTURE_THRESHOLD]))
     cg.add(var.set_gesture_timeout(config[CONF_GESTURE_TIMEOUT]))
+    cg.add(var.set_long_press_time(config[CONF_LONG_PRESS_TIME]))
 
     # Register all local sensors so they can be bound by string ID at runtime
     from esphome import core

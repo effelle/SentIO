@@ -27,9 +27,11 @@ namespace sentio {
 // Touch-state machine (used when a touch_source is configured)
 // ---------------------------------------------------------------------------
 enum class TouchState : uint8_t {
-  IDLE,      // Finger up, waiting
-  START,     // Finger just placed, measuring intent
-  DRAGGING,  // Movement exceeded threshold — classifying as swipe
+  IDLE,       // Finger up, waiting
+  START,      // Finger just placed, measuring intent
+  DRAGGING,   // Movement exceeded threshold (slower or timeout exceeded)
+  SWIPE,      // Movement classified as swipe
+  LONG_PRESS, // Finger held in place long enough
 };
 
 // ---------------------------------------------------------------------------
@@ -117,6 +119,7 @@ class SentioComponent : public Component, public api::CustomAPIDevice {
   void set_soft_sleep_only(bool v)                    { soft_sleep_only_ = v; }
   void set_gesture_threshold(uint16_t px)             { gesture_threshold_px_ = px; }
   void set_gesture_timeout(uint32_t ms)               { gesture_timeout_ms_ = ms; }
+  void set_long_press_time(uint32_t ms)               { long_press_time_ms_ = ms; }
 
   // ── Trigger callback registration (called by Trigger constructors) ────────
   void add_on_sleep_callback(std::function<void()> cb) {
@@ -185,15 +188,19 @@ class SentioComponent : public Component, public api::CustomAPIDevice {
   bool     soft_sleep_only_{false};   // True when touch chip has no reset_pin
   uint32_t last_activity_ms_{0};
 
-  // ── Gesture tuning ────────────────────────────────────────────────────────
+  // ── Gesture & Input tuning ────────────────────────────────────────────────
   uint16_t gesture_threshold_px_{80};  // Min displacement to classify as swipe
   uint32_t gesture_timeout_ms_{300};   // Max ms in START before locking out gesture
+  uint32_t long_press_time_ms_{500};   // Time in ms to register a long press
 
-  // ── Touch state machine ───────────────────────────────────────────────────
+  // ── Touch state machine & Hook state ──────────────────────────────────────
   TouchState touch_state_{TouchState::IDLE};
   int16_t    touch_start_x_{0};
   int16_t    touch_start_y_{0};
   uint32_t   touch_start_ms_{0};
+  bool       input_devices_hooked_{false};
+  lv_indev_read_cb_t original_read_cb_{nullptr};
+  lv_indev_t *original_indev_{nullptr};
 
   // ── LVGL objects ──────────────────────────────────────────────────────────
   lv_obj_t  *root_container_{nullptr}; // Full-screen transparent container
@@ -228,6 +235,9 @@ class SentioComponent : public Component, public api::CustomAPIDevice {
   void set_backlight(float level);
   void spawn_shield();
   void destroy_shield();
+  void hook_input_devices();
+  static void indev_read_cb_wrapper(lv_indev_t *indev, lv_indev_data_t *data);
+  void handle_indev_read(lv_indev_t *indev, lv_indev_data_t *data);
 
   // JSONL engine
   void       parse_jsonl_line(const std::string &line);

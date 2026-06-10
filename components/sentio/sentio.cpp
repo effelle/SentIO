@@ -126,65 +126,8 @@ void SentioComponent::setup() {
 void SentioComponent::loop() {
   uint32_t now = millis();
 
-  // ── Track touch activity from upstream driver and detect gestures ─────────
-  if (touch_source_ != nullptr) {
-    auto touches = touch_source_->get_touches();
-    if (!touches.empty()) {
-      auto touch = touches.front();
-
-      if (is_sleeping_) {
-        // Touch while sleeping: wake up
-        wake_up();
-        if (suppress_wake_click_) {
-          ignore_wake_tap_ = true;
-          // Transition immediately to DRAGGING to suppress any gesture triggers on wake-up touch
-          touch_state_ = TouchState::DRAGGING;
-          return;
-        }
-      }
-
-      last_activity_ms_ = now;
-
-      // Gesture State Machine
-      if (touch_state_ == TouchState::IDLE) {
-        touch_state_ = TouchState::START;
-        touch_start_x_ = touch.x;
-        touch_start_y_ = touch.y;
-        touch_start_ms_ = now;
-      } else if (touch_state_ == TouchState::START) {
-        int16_t dx = touch.x - touch_start_x_;
-        int16_t dy = touch.y - touch_start_y_;
-
-        // Timeout: if still in START after gesture_timeout_ms_, this is a
-        // tap or long-press — lock out gesture for the rest of this touch.
-        if (now - touch_start_ms_ > gesture_timeout_ms_) {
-          touch_state_ = TouchState::DRAGGING;
-        } else if (std::abs(dx) >= gesture_threshold_px_ || std::abs(dy) >= gesture_threshold_px_) {
-          touch_state_ = TouchState::DRAGGING;
-
-          if (std::abs(dx) >= std::abs(dy)) {
-            // Horizontal swipe
-            if (dx > 0) {
-              handle_gesture(LV_DIR_RIGHT);
-            } else {
-              handle_gesture(LV_DIR_LEFT);
-            }
-          } else {
-            // Vertical swipe
-            if (dy > 0) {
-              handle_gesture(LV_DIR_BOTTOM);
-            } else {
-              handle_gesture(LV_DIR_TOP);
-            }
-          }
-        }
-      }
-    } else {
-      // Finger released
-      touch_state_ = TouchState::IDLE;
-      ignore_wake_tap_ = false;
-    }
-  }
+  // ── Hook pointer input devices ───────────────────────────────────────────
+  this->hook_input_devices();
 
   // ── Sleep timeout ────────────────────────────────────────────────────────
   if (!is_sleeping_ && sleep_timeout_ms_ > 0) {
@@ -955,6 +898,117 @@ void SentioComponent::service_load_page(std::string page_id) {
   this->on_page_show_callbacks_.call(page_id);
 
   last_activity_ms_ = millis();
+}
+
+void SentioComponent::hook_input_devices() {
+  if (this->input_devices_hooked_) return;
+
+  lv_indev_t *indev = lv_indev_get_next(nullptr);
+  while (indev != nullptr) {
+    if (lv_indev_get_type(indev) == LV_INDEV_TYPE_POINTER) {
+      lv_indev_read_cb_t orig_cb = lv_indev_get_read_cb(indev);
+      if (orig_cb != nullptr && orig_cb != SentioComponent::indev_read_cb_wrapper) {
+        this->original_read_cb_ = orig_cb;
+        this->original_indev_ = indev;
+        lv_indev_set_read_cb(indev, SentioComponent::indev_read_cb_wrapper);
+        
+        // Try to apply the long press time to LVGL's input device as well
+#if LVGL_VERSION_MAJOR >= 9
+        lv_indev_set_long_press_time(indev, this->long_press_time_ms_);
+#endif
+        
+        this->input_devices_hooked_ = true;
+        ESP_LOGI(TAG, "SentIO: Successfully hooked pointer input device read_cb");
+        break;
+      }
+    }
+    indev = lv_indev_get_next(indev);
+  }
+}
+
+void SentioComponent::indev_read_cb_wrapper(lv_indev_t *indev, lv_indev_data_t *data) {
+  if (SentioComponent::instance != nullptr) {
+    SentioComponent::instance->handle_indev_read(indev, data);
+  }
+}
+
+void SentioComponent::handle_indev_read(lv_indev_t *indev, lv_indev_data_t *data) {
+  if (this->original_read_cb_ != nullptr) {
+    this->original_read_cb_(indev, data);
+  }
+
+  uint32_t now = millis();
+
+  // Reset activity timer on touch press
+  if (data->state == LV_INDEV_STATE_PR) {
+    this->last_activity_ms_ = now;
+  }
+
+  // Handle sleep wake-up
+  if (data->state == LV_INDEV_STATE_PR) {
+    if (this->is_sleeping_) {
+      this->wake_up();
+      if (this->suppress_wake_click_) {
+        this->ignore_wake_tap_ = true;
+        this->touch_state_ = TouchState::SWIPE; // Using SWIPE to suppress this entire gesture
+      }
+    }
+  }
+
+  // Handle gestures and custom state machine
+  if (data->state == LV_INDEV_STATE_PR) {
+    if (this->touch_state_ == TouchState::IDLE) {
+      this->touch_state_ = TouchState::START;
+      this->touch_start_x_ = data->point.x;
+      this->touch_start_y_ = data->point.y;
+      this->touch_start_ms_ = now;
+    } else if (this->touch_state_ == TouchState::START) {
+      int16_t dx = data->point.x - this->touch_start_x_;
+      int16_t dy = data->point.y - this->touch_start_y_;
+
+      // Detect gesture displacement
+      if (std::abs(dx) >= this->gesture_threshold_px_ || std::abs(dy) >= this->gesture_threshold_px_) {
+        if (now - this->touch_start_ms_ <= this->gesture_timeout_ms_) {
+          this->touch_state_ = TouchState::SWIPE;
+          if (std::abs(dx) >= std::abs(dy)) {
+            this->handle_gesture(dx > 0 ? LV_DIR_RIGHT : LV_DIR_LEFT);
+          } else {
+            this->handle_gesture(dy > 0 ? LV_DIR_BOTTOM : LV_DIR_TOP);
+          }
+        } else {
+          this->touch_state_ = TouchState::DRAGGING;
+        }
+      }
+      // Detect long press timeout
+      else if (now - this->touch_start_ms_ >= this->long_press_time_ms_) {
+        this->touch_state_ = TouchState::LONG_PRESS;
+        ESP_LOGD(TAG, "Touch classified as LONG_PRESS");
+      }
+    }
+  } else {
+    // Finger released (LV_INDEV_STATE_REL)
+    if (this->touch_state_ == TouchState::LONG_PRESS) {
+      // Suppress release click by placing coordinate out-of-bounds
+      data->state = LV_INDEV_STATE_REL;
+      data->point.x = -1000;
+      data->point.y = -1000;
+      ESP_LOGD(TAG, "Suppressing click after long press");
+    } else if (this->touch_state_ == TouchState::SWIPE) {
+      // Suppress release click for swipe
+      data->state = LV_INDEV_STATE_REL;
+      data->point.x = -1000;
+      data->point.y = -1000;
+    }
+    this->touch_state_ = TouchState::IDLE;
+    this->ignore_wake_tap_ = false;
+  }
+
+  // Force suppress coordinates if currently in SWIPE state
+  if (this->touch_state_ == TouchState::SWIPE) {
+    data->state = LV_INDEV_STATE_REL;
+    data->point.x = -1000;
+    data->point.y = -1000;
+  }
 }
 
 }  // namespace sentio

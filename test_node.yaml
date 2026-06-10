@@ -42,6 +42,7 @@ i2c:
   sda: GPIO4
   scl: GPIO8
   scan: true
+  id: i2c_bus
 
 output:
   - platform: ledc
@@ -81,11 +82,6 @@ display:
       height: 480
     update_interval: never
 
-# ── Globals ───────────────────────────────────────────────────────────────────
-globals:
-  - id: g_long_pressed
-    type: bool
-    initial_value: 'false'
 
 # ── LVGL — widgets defined here, no on_boot lambda needed ────────────────────
 lvgl:
@@ -130,21 +126,11 @@ lvgl:
                     text_color: 0xE6EDF0
                     align: CENTER
               on_click:
-                - if:
-                    condition:
-                      lambda: 'return !id(g_long_pressed);'
-                    then:
-                      - logger.log: ">>> TAP"
-                      - lvgl.label.update:
-                          id: lbl_status
-                          text: "TAP ✓"
-                - globals.set:
-                    id: g_long_pressed
-                    value: 'false'
+                - logger.log: ">>> TAP"
+                - lvgl.label.update:
+                    id: lbl_status
+                    text: "TAP ✓"
               on_long_press:
-                - globals.set:
-                    id: g_long_pressed
-                    value: 'true'
                 - logger.log: ">>> LONG PRESS"
                 - lvgl.label.update:
                     id: lbl_status
@@ -188,6 +174,7 @@ sentio:
   sleep_timeout: 300s
   suppress_wake_click: true
   soft_sleep_only: false
+  long_press_time: 500ms
 
   on_swipe_left:
     - logger.log: ">>> SWIPE LEFT"

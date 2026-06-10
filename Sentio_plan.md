@@ -164,23 +164,23 @@ SentIO/
 
 ### Phase 5: Power Management & Tap-to-Wake
 ```
-[ ] Task 5.1: sleep_wake_shield
+[x] Task 5.1: sleep_wake_shield
     Implement the sleep dimming timer, backlight integration, and the transparent wake-up shield overlay in LVGL.
     - Input: Backlight component reference + transparent clickable overlay.
     - Output: Touch-decoupled tap-to-wake functionality.
     - Verify: Review C++ logic to ensure touch events are consumed by the shield when waking.
 
-[ ] Task 5.2: animation_pause
+[x] Task 5.2: animation_pause
     On sleep entry call lv_timer_pause_all(). On wake call lv_timer_resume_all().
     Add display_off_before_sleep flag (LVGL blank + backlight=0 before on_sleep trigger fires).
     - Verify: Confirm CPU usage drops during sleep by checking loop() timing.
 
-[ ] Task 5.3: anti_burn_in
+[x] Task 5.3: anti_burn_in
     Implement optional anti_burn_in YAML key. When true, register an lv_timer that shifts
     the active screen by ±1-2px every 60s using lv_obj_set_pos on the root container.
     - Verify: Logic audit — confirm shift is < 3px to avoid visible clipping.
 
-[ ] Task 5.4: touch_chip_safety_gate
+[x] Task 5.4: touch_chip_safety_gate
     In setup(), check if source touchscreen has a reset_pin. If null, set soft_sleep_only_ = true.
     When sleeping with soft_sleep_only_, skip I2C sleep commands. Only stop polling touch data.
     - Verify: Code review confirms no I2C writes occur in soft sleep path.
