@@ -155,10 +155,11 @@ void SentioComponent::loop() {
         int16_t dx = touch.x - touch_start_x_;
         int16_t dy = touch.y - touch_start_y_;
 
-        // Use 80 pixels threshold (25% of 320px screen width) for reliable swipes
-        const int16_t threshold = 80;
-
-        if (std::abs(dx) >= threshold || std::abs(dy) >= threshold) {
+        // Timeout: if still in START after gesture_timeout_ms_, this is a
+        // tap or long-press — lock out gesture for the rest of this touch.
+        if (now - touch_start_ms_ > gesture_timeout_ms_) {
+          touch_state_ = TouchState::DRAGGING;
+        } else if (std::abs(dx) >= gesture_threshold_px_ || std::abs(dy) >= gesture_threshold_px_) {
           touch_state_ = TouchState::DRAGGING;
 
           if (std::abs(dx) >= std::abs(dy)) {

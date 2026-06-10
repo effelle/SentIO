@@ -115,6 +115,8 @@ class SentioComponent : public Component, public api::CustomAPIDevice {
   void set_display_off_before_sleep(bool v)           { display_off_before_sleep_ = v; }
   void set_startup_layout(const std::string &path)    { startup_layout_ = path; }
   void set_soft_sleep_only(bool v)                    { soft_sleep_only_ = v; }
+  void set_gesture_threshold(uint16_t px)             { gesture_threshold_px_ = px; }
+  void set_gesture_timeout(uint32_t ms)               { gesture_timeout_ms_ = ms; }
 
   // ── Trigger callback registration (called by Trigger constructors) ────────
   void add_on_sleep_callback(std::function<void()> cb) {
@@ -183,7 +185,11 @@ class SentioComponent : public Component, public api::CustomAPIDevice {
   bool     soft_sleep_only_{false};   // True when touch chip has no reset_pin
   uint32_t last_activity_ms_{0};
 
-  // ── Touch state machine (Phase 2) ─────────────────────────────────────────
+  // ── Gesture tuning ────────────────────────────────────────────────────────
+  uint16_t gesture_threshold_px_{80};  // Min displacement to classify as swipe
+  uint32_t gesture_timeout_ms_{300};   // Max ms in START before locking out gesture
+
+  // ── Touch state machine ───────────────────────────────────────────────────
   TouchState touch_state_{TouchState::IDLE};
   int16_t    touch_start_x_{0};
   int16_t    touch_start_y_{0};

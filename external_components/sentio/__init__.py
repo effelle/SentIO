@@ -50,6 +50,8 @@ CONF_ANTI_BURN_IN             = "anti_burn_in"
 CONF_DISPLAY_OFF_BEFORE_SLEEP = "display_off_before_sleep"
 CONF_STARTUP_LAYOUT           = "startup_layout"
 CONF_SOFT_SLEEP_ONLY          = "soft_sleep_only"
+CONF_GESTURE_THRESHOLD        = "gesture_threshold"
+CONF_GESTURE_TIMEOUT          = "gesture_timeout"
 CONF_ON_SLEEP                 = "on_sleep"
 CONF_ON_WAKE                  = "on_wake"
 CONF_ON_SWIPE_LEFT            = "on_swipe_left"
@@ -93,6 +95,15 @@ CONFIG_SCHEMA = cv.Schema({
     # Override auto-detected soft sleep (no reset pin)
     cv.Optional(CONF_SOFT_SLEEP_ONLY): cv.boolean,
 
+    # Gesture detection tuning (applies when touch_source is configured)
+    # gesture_threshold: min pixels of displacement to register as a swipe (default 80)
+    cv.Optional(CONF_GESTURE_THRESHOLD, default=80): cv.int_range(min=10, max=300),
+    # gesture_timeout: max ms a touch can stay in START before it's classified as
+    # a tap/long-press and gesture detection is locked out (default 300 ms).
+    # Set this lower than your long_press threshold to prevent drift-swipes.
+    cv.Optional(CONF_GESTURE_TIMEOUT, default="300ms"):
+        cv.positive_time_period_milliseconds,
+
     # Automation triggers
     cv.Optional(CONF_ON_SLEEP): automation.validate_automation({
         cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(SleepTrigger),
@@ -130,7 +141,7 @@ async def to_code(config):
     # Ensure the SentIO header is visible to all generated lambdas
     # (including on_boot: lambdas in the esphome: block that reference
     #  esphome::sentio::SentioComponent::instance).
-    cg.add_global(cg.RawExpression('#include "esphome/components/sentio/sentio.h"'))
+    cg.add_global(cg.RawStatement('#include "esphome/components/sentio/sentio.h"'))
 
     # Touch source (optional smart-touch proxy)
     if CONF_TOUCH_SOURCE in config:
@@ -170,6 +181,10 @@ async def to_code(config):
     # Startup layout file
     if config[CONF_STARTUP_LAYOUT]:
         cg.add(var.set_startup_layout(config[CONF_STARTUP_LAYOUT]))
+
+    # Gesture tuning
+    cg.add(var.set_gesture_threshold(config[CONF_GESTURE_THRESHOLD]))
+    cg.add(var.set_gesture_timeout(config[CONF_GESTURE_TIMEOUT]))
 
     # Register all local sensors so they can be bound by string ID at runtime
     from esphome import core
