@@ -1,8 +1,7 @@
 #include "sentio_sd.h"
+#include "esphome/core/log.h"
 
 #ifdef USE_SENTIO_SD
-
-#include "esphome/core/log.h"
 
 #include "esp_vfs_fat.h"
 #include "sdmmc_cmd.h"
