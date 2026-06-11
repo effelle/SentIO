@@ -17,6 +17,7 @@ from esphome.components.esp32 import (
     add_idf_sdkconfig_option,
     require_vfs_dir,
     require_vfs_select,
+    include_builtin_idf_component,
 )
 from esphome.core import CORE
 
@@ -24,6 +25,9 @@ from esphome.core import CORE
 # ESP32 component's to_code() checks them (it runs before ours).
 require_vfs_dir()
 require_vfs_select()
+# Include built-in ESP-IDF components for SD card support (fatfs, sdmmc, vfs, etc.)
+for comp in ("fatfs", "sdmmc", "vfs", "driver", "spi_flash"):
+    include_builtin_idf_component(comp)
 from esphome.const import CONF_ID, CONF_TRIGGER_ID
 from esphome.core import CORE
 
