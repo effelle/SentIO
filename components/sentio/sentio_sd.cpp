@@ -1,6 +1,6 @@
 #include "sentio_sd.h"
 
-#ifdef USE_ESP_IDF
+#ifdef USE_SENTIO_SD
 
 #include "esphome/core/log.h"
 
@@ -167,4 +167,4 @@ int SdCardManager::mount_spi_(const SdCardConfig &cfg, void *mount_cfg_p, void *
 }  // namespace sentio
 }  // namespace esphome
 
-#endif  // USE_ESP_IDF
+#endif  // USE_SENTIO_SD

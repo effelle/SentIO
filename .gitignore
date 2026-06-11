@@ -15,3 +15,4 @@ Thumbs.db
 
 # Agent
 .agent/
+.AGENTS.md
