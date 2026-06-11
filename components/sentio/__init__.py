@@ -13,21 +13,9 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome import automation
 from esphome.components import light, output, touchscreen
-from esphome.components.esp32 import (
-    add_idf_sdkconfig_option,
-    require_vfs_dir,
-    require_vfs_select,
-    include_builtin_idf_component,
-)
+from esphome.components.esp32 import add_idf_sdkconfig_option
 from esphome.core import CORE
-
-# Call VFS requirement hooks at module-import time so they are set before the
-# ESP32 component's to_code() checks them (it runs before ours).
-require_vfs_dir()
-require_vfs_select()
-# Include built-in ESP-IDF components for SD card support (fatfs, sdmmc, vfs, etc.)
-for comp in ("fatfs", "sdmmc", "vfs", "driver", "spi_flash"):
-    include_builtin_idf_component(comp)
+import esphome.codegen as cg
 from esphome.const import CONF_ID, CONF_TRIGGER_ID
 from esphome.core import CORE
 
@@ -318,6 +306,12 @@ async def to_code(config):
             )
         sd = config[CONF_SD_CARD]
         cg.add_define("USE_SENTIO_SD")
+        # Register ESP-IDF components as platformio lib_deps so they're linked
+        cg.add_library("fatfs", None)
+        cg.add_library("sdmmc", None)
+        cg.add_library("driver", None)
+        cg.add_library("spi_flash", None)
+        cg.add_library("vfs", None)
         # FatFS Long Filename (LFN) support — required for filenames > 8.3 chars.
         add_idf_sdkconfig_option("CONFIG_FATFS_LFN_HEAP",     "y")
         add_idf_sdkconfig_option("CONFIG_FATFS_CODEPAGE_437", "y")
