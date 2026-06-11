@@ -14,10 +14,9 @@ import esphome.config_validation as cv
 from esphome import automation
 from esphome.components import light, output, touchscreen
 from esphome.components.esp32 import add_idf_sdkconfig_option
-from esphome.core import CORE
-import esphome.codegen as cg
 from esphome.const import CONF_ID, CONF_TRIGGER_ID
 from esphome.core import CORE
+from esphome.helpers import write_file_if_changed
 
 CODEOWNERS = ["@effelle"]
 DEPENDENCIES = ["api", "lvgl"]
@@ -306,12 +305,17 @@ async def to_code(config):
             )
         sd = config[CONF_SD_CARD]
         cg.add_define("USE_SENTIO_SD")
-        # Register ESP-IDF components as platformio lib_deps so they're linked
-        cg.add_library("fatfs", None)
-        cg.add_library("sdmmc", None)
-        cg.add_library("driver", None)
-        cg.add_library("spi_flash", None)
-        cg.add_library("vfs", None)
+        # ESP-IDF built-in components (fatfs, sdmmc, driver, spi_flash, vfs) are
+        # excluded from the default ESPHome build.  We write a CMakeLists.txt to
+        # the project src/ directory so that PlatformIO's ESP-IDF builder finds
+        # it and does NOT overwrite it with the default (no-PRIV_REQUIRES) template.
+        cmake_path = CORE.relative_src_path("CMakeLists.txt")
+        cmake_content = (
+            "FILE(GLOB_RECURSE app_sources ${CMAKE_CURRENT_SOURCE_DIR}/*.*)\n"
+            "idf_component_register(SRCS ${app_sources}\n"
+            "                       PRIV_REQUIRES fatfs sdmmc driver spi_flash vfs)\n"
+        )
+        write_file_if_changed(cmake_path, cmake_content)
         # FatFS Long Filename (LFN) support — required for filenames > 8.3 chars.
         add_idf_sdkconfig_option("CONFIG_FATFS_LFN_HEAP",     "y")
         add_idf_sdkconfig_option("CONFIG_FATFS_CODEPAGE_437", "y")
