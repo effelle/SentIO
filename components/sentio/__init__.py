@@ -17,6 +17,8 @@ from esphome.components.esp32 import (
     add_idf_sdkconfig_option,
     require_vfs_dir,
     require_vfs_select,
+    KEY_ESP32,
+    KEY_COMPONENTS,
 )
 from esphome.core import CORE
 from esphome.const import CONF_ID, CONF_TRIGGER_ID
@@ -312,8 +314,14 @@ async def to_code(config):
         # Require VFS support (disabled by default in ESPHome) for statvfs/fatfs
         require_vfs_dir()
         require_vfs_select()
-        # Include fatfs component for FatFS API (f_getfree, etc.)
-        cg.add_platformio_option("build_flags", ["-D CONFIG_FATFS_LFN_HEAP=y", "-D CONFIG_FATFS_CODEPAGE_437=y", "-D CONFIG_FATFS_FS_LOCK=5"])
+        # Register required ESP-IDF components for idf_component.yml generation
+        # These components provide: esp_vfs_fat.h, sdmmc_cmd.h, sys/statvfs.h, etc.
+        for comp_name in ("fatfs", "sdmmc", "vfs", "driver", "spi_flash"):
+            CORE.data[KEY_ESP32][KEY_COMPONENTS][comp_name] = {
+                "repo": None,
+                "ref": None,
+                "path": comp_name,
+            }
         # FatFS Long Filename (LFN) support — required for filenames > 8.3 chars.
         add_idf_sdkconfig_option("CONFIG_FATFS_LFN_HEAP",     "y")
         add_idf_sdkconfig_option("CONFIG_FATFS_CODEPAGE_437", "y")
