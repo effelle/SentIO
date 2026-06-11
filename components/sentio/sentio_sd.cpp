@@ -1,5 +1,5 @@
-#include "esphome/core/log.h"
 #include "sentio_sd.h"
+#include "esphome/core/log.h"
 
 #ifdef USE_SENTIO_SD
 

@@ -12,9 +12,7 @@
 
 #include "lvgl.h"
 
-#ifdef USE_SENTIO_SD
-#  include "sentio_sd.h"
-#endif
+#include "sentio_sd.h"
 
 #ifdef USE_SENSOR
 #include "esphome/components/sensor/sensor.h"

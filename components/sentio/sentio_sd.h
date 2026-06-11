@@ -1,7 +1,5 @@
 #pragma once
 
-#ifdef USE_SENTIO_SD
-
 #include <cstdint>
 
 namespace esphome {
@@ -52,4 +50,3 @@ class SdCardManager {
 }  // namespace sentio
 }  // namespace esphome
 
-#endif  // USE_SENTIO_SD
