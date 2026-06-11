@@ -119,7 +119,8 @@ def _validate_sd_pins(config):
 # ---------------------------------------------------------------------------
 # Schema
 # ---------------------------------------------------------------------------
-CONFIG_SCHEMA = cv.Schema({
+CONFIG_SCHEMA = cv.All(
+    cv.Schema({
     cv.GenerateID(): cv.declare_id(SentioComponent),
 
     # Optional: proxy an existing ESPHome touchscreen for smart-touch features.
@@ -214,10 +215,9 @@ CONFIG_SCHEMA = cv.Schema({
         cv.Optional(CONF_SD_CS_HARDWIRED, default=False): cv.boolean,
         cv.Optional(CONF_SD_FORMAT_IF_MOUNT_FAILED, default=False): cv.boolean,
     }),
-}).extend(cv.COMPONENT_SCHEMA)
-
-# Wrap with the pin-completeness validator
-CONFIG_SCHEMA = cv.All(_validate_sd_pins, CONFIG_SCHEMA)
+    }).extend(cv.COMPONENT_SCHEMA),
+    _validate_sd_pins,
+)
 
 
 @automation.register_condition(
