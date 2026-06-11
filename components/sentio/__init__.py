@@ -87,40 +87,62 @@ SD_MODE_OPTIONS = {
 }
 
 
-def _validate_sd_pins(config):
-    """Enforce pin completeness and SPI host rules per interface mode."""
-    if CONF_SD_CARD not in config:
-        return config
-    sd = config[CONF_SD_CARD]
-    mode = sd.get(CONF_SD_MODE, "sdmmc_4bit")
+def _sd_card_schema(value):
+    """Apply the sd_card field schema then enforce cross-field pin rules.
+
+    Keeping validation inside the sub-schema (rather than wrapping CONFIG_SCHEMA
+    in cv.All) lets ESPHome introspect the top-level schema keys correctly and
+    produce accurate 'invalid option' messages for unrelated fields.
+    """
+    value = cv.Schema({
+        cv.Optional(CONF_SD_MODE, default="sdmmc_4bit"):
+            cv.enum(SD_MODE_OPTIONS),
+        cv.Required(CONF_SD_CLK_PIN):   cv.int_range(min=0, max=48),
+        cv.Required(CONF_SD_CMD_PIN):   cv.int_range(min=0, max=48),
+        cv.Required(CONF_SD_DATA0_PIN): cv.int_range(min=0, max=48),
+        cv.Optional(CONF_SD_DATA1_PIN): cv.int_range(min=0, max=48),
+        cv.Optional(CONF_SD_DATA2_PIN): cv.int_range(min=0, max=48),
+        cv.Optional(CONF_SD_DATA3_PIN): cv.int_range(min=0, max=48),
+        # Required when mode: spi. Must be declared explicitly — there is no
+        # safe default because the right host depends on your board wiring:
+        #   spi_host: 1  (SPI2_HOST) — share with a standard single-wire SPI bus
+        #   spi_host: 2  (SPI3_HOST) — separate bus; mandatory on QSPI/quad-SPI boards
+        # Not used for SDMMC modes.
+        cv.Optional(CONF_SD_SPI_HOST): cv.int_range(min=0, max=2),
+        # Set true when D3/CS is hardwired to GND on the PCB (e.g. JC3248W535).
+        # In this case data3_pin is a dummy GPIO — the driver toggles it but the
+        # card ignores it because the hardware CS is permanently asserted.
+        cv.Optional(CONF_SD_CS_HARDWIRED, default=False): cv.boolean,
+        cv.Optional(CONF_SD_FORMAT_IF_MOUNT_FAILED, default=False): cv.boolean,
+    })(value)
+
+    mode = value.get(CONF_SD_MODE, "sdmmc_4bit")
 
     if mode == "sdmmc_4bit":
         for pin in (CONF_SD_DATA1_PIN, CONF_SD_DATA2_PIN, CONF_SD_DATA3_PIN):
-            if pin not in sd:
-                raise cv.Invalid(
-                    f"sd_card mode 'sdmmc_4bit' requires '{pin}'"
-                )
+            if pin not in value:
+                raise cv.Invalid(f"sd_card mode 'sdmmc_4bit' requires '{pin}'")
 
     if mode == "spi":
-        if CONF_SD_DATA3_PIN not in sd:
+        if CONF_SD_DATA3_PIN not in value:
             raise cv.Invalid(
                 "sd_card mode 'spi' uses data3_pin as CS — it must be specified"
             )
-        if CONF_SD_SPI_HOST not in sd:
+        if CONF_SD_SPI_HOST not in value:
             raise cv.Invalid(
                 "sd_card mode 'spi' requires 'spi_host'.\n"
-                "  spi_host: 1  → SPI2_HOST (shared with display on most single-SPI boards)\n"
+                "  spi_host: 1  → SPI2_HOST (shared with display on single-SPI boards)\n"
                 "  spi_host: 2  → SPI3_HOST (separate bus; required on QSPI/quad-SPI boards)\n"
                 "Check your board's SPI wiring before choosing."
             )
 
-    return config
+    return value
+
 
 # ---------------------------------------------------------------------------
 # Schema
 # ---------------------------------------------------------------------------
-CONFIG_SCHEMA = cv.All(
-    cv.Schema({
+CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(SentioComponent),
 
     # Optional: proxy an existing ESPHome touchscreen for smart-touch features.
@@ -194,30 +216,8 @@ CONFIG_SCHEMA = cv.All(
     # When present, SentIO mounts the card during setup() and registers the
     # LVGL 'S:' driver.  Bare paths (no /sdcard or /littlefs prefix) resolve
     # to SD first; LittleFS is used as fallback when SD is absent.
-    cv.Optional(CONF_SD_CARD): cv.Schema({
-        cv.Optional(CONF_SD_MODE, default="sdmmc_4bit"):
-            cv.enum(SD_MODE_OPTIONS),
-        cv.Required(CONF_SD_CLK_PIN):   cv.int_range(min=0, max=48),
-        cv.Required(CONF_SD_CMD_PIN):   cv.int_range(min=0, max=48),
-        cv.Required(CONF_SD_DATA0_PIN): cv.int_range(min=0, max=48),
-        cv.Optional(CONF_SD_DATA1_PIN): cv.int_range(min=0, max=48),
-        cv.Optional(CONF_SD_DATA2_PIN): cv.int_range(min=0, max=48),
-        cv.Optional(CONF_SD_DATA3_PIN): cv.int_range(min=0, max=48),
-        # Required when mode: spi. Must be declared explicitly — there is no
-        # safe default because the right host depends on your board wiring:
-        #   spi_host: 1  (SPI2_HOST) — share with a standard single-wire SPI bus
-        #   spi_host: 2  (SPI3_HOST) — separate bus; mandatory on QSPI/quad-SPI boards
-        # Not used for SDMMC modes.
-        cv.Optional(CONF_SD_SPI_HOST): cv.int_range(min=0, max=2),
-        # Set true when D3/CS is hardwired to GND on the PCB (e.g. JC3248W535).
-        # In this case data3_pin is a dummy GPIO — the driver toggles it but the
-        # card ignores it because the hardware CS is permanently asserted.
-        cv.Optional(CONF_SD_CS_HARDWIRED, default=False): cv.boolean,
-        cv.Optional(CONF_SD_FORMAT_IF_MOUNT_FAILED, default=False): cv.boolean,
-    }),
-    }).extend(cv.COMPONENT_SCHEMA),
-    _validate_sd_pins,
-)
+    cv.Optional(CONF_SD_CARD): _sd_card_schema,
+}).extend(cv.COMPONENT_SCHEMA)
 
 
 @automation.register_condition(
