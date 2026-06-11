@@ -13,7 +13,7 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome import automation
 from esphome.components import light, output, touchscreen
-from esphome.components.esp32 import add_idf_sdkconfig_option
+from esphome.components.esp32 import add_idf_sdkconfig_option, include_builtin_idf_component
 from esphome.const import CONF_ID, CONF_TRIGGER_ID
 from esphome.core import CORE
 
@@ -304,12 +304,12 @@ async def to_code(config):
             )
         sd = config[CONF_SD_CARD]
         cg.add_define("USE_SENTIO_SD")
-        # Declare ESP-IDF component dependencies for SD card / FatFS
-        cg.add_library("fatfs", None)
-        cg.add_library("sdmmc", None)
-        cg.add_library("vfs", None)
-        cg.add_library("driver", None)
-        cg.add_library("spi_flash", None)
+        # Include required ESP-IDF components (excluded by default for build speed)
+        include_builtin_idf_component("fatfs")
+        include_builtin_idf_component("sdmmc")
+        include_builtin_idf_component("vfs")
+        include_builtin_idf_component("driver")
+        include_builtin_idf_component("spi_flash")
         # FatFS Long Filename (LFN) support — required for filenames > 8.3 chars.
         add_idf_sdkconfig_option("CONFIG_FATFS_LFN_HEAP",     "y")
         add_idf_sdkconfig_option("CONFIG_FATFS_CODEPAGE_437", "y")
