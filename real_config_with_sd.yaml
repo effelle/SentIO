@@ -158,12 +158,12 @@ lvgl:
                 - logger.log: ">>> TAP"
                 - lvgl.label.update:
                     id: lbl_status
-                    text: "TAP ✓"
+                    text: "TAP"
               on_long_press:
                 - logger.log: ">>> LONG PRESS"
                 - lvgl.label.update:
                     id: lbl_status
-                    text: "LONG PRESS ✓"
+                    text: "LONG PRESS"
 
           # ── Reset button ──────────────────────────────────────────────────
           - button:
@@ -195,6 +195,37 @@ lvgl:
               text_color: 0x30363D
               text_font: MONTSERRAT_14
 
+
+# ── SD card sensors ───────────────────────────────────────────────────────────
+binary_sensor:
+  - platform: template
+    name: "SD Card Mounted"
+    id: sd_card_mounted
+    device_class: connectivity
+    lambda: |-
+      return id(my_sentio).is_sd_mounted();
+
+sensor:
+  - platform: template
+    name: "SD Card Free Space"
+    id: sd_free_space
+    unit_of_measurement: "MB"
+    icon: "mdi:sd"
+    accuracy_decimals: 0
+    update_interval: 60s
+    lambda: |-
+      return id(my_sentio).get_sd_free_mb();
+
+  - platform: template
+    name: "SD Card Total Space"
+    id: sd_total_space
+    unit_of_measurement: "MB"
+    icon: "mdi:sd"
+    accuracy_decimals: 0
+    update_interval: 3600s   # Capacity never changes — poll rarely
+    lambda: |-
+      return id(my_sentio).get_sd_total_mb();
+
 # ── SentIO — handles swipes ───────────────────────────────────────────────────
 sentio:
   id: my_sentio
@@ -208,33 +239,54 @@ sentio:
   long_press_time: 500ms
   anti_burn_in: true
 
+  sd_card:
+    # JC3248W535 continuity-test results:
+    #   CLK  = GPIO12   CMD/MOSI = GPIO10   D0/MISO = GPIO13
+    #   D3/CS = hardwired to GND on PCB → SPI mode forced permanently
+    #   D2    = GND (unused in SPI mode)   D1 = unknown / unconnected
+    #
+    # SPI3_HOST (host 2) is used — display occupies SPI2_HOST via QSPI.
+    # GPIO10/12/13 are entirely separate from the display bus (21,39,40,47,48).
+    #
+    # cs_hardwired: true tells SentIO that D3 is permanently asserted on the
+    # PCB. data3_pin is a dummy GPIO the IDF SPI driver must have; GPIO11 is
+    # free, not on the silk screen, and not allocated to anything else.
+    mode: spi
+    spi_host: 2       # SPI3_HOST — separate from the QSPI display (SPI2_HOST)
+    clk_pin:    12
+    cmd_pin:    10    # MOSI
+    data0_pin:  13    # MISO
+    data3_pin:  11    # Dummy CS — D3/CS is hardwired to GND on the PCB
+    cs_hardwired: true
+    format_if_mount_failed: false
+
+
   on_swipe_left:
     - logger.log: ">>> SWIPE LEFT"
     - lvgl.label.update:
         id: lbl_status
-        text: "SWIPE LEFT ✓"
+        text: "SWIPE LEFT"
 
   on_swipe_right:
     - logger.log: ">>> SWIPE RIGHT"
     - lvgl.label.update:
         id: lbl_status
-        text: "SWIPE RIGHT ✓"
+        text: "SWIPE RIGHT"
 
   on_swipe_up:
     - logger.log: ">>> SWIPE UP"
     - lvgl.label.update:
         id: lbl_status
-        text: "SWIPE UP ✓"
+        text: "SWIPE UP"
 
   on_swipe_down:
     - logger.log: ">>> SWIPE DOWN"
     - lvgl.label.update:
         id: lbl_status
-        text: "SWIPE DOWN ✓"
+        text: "SWIPE DOWN"
 
   on_sleep:
     - logger.log: "Screen sleeping"
 
   on_wake:
     - logger.log: "Screen woke up"
-

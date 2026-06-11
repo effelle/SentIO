@@ -9,6 +9,10 @@
 #  include "LittleFS.h"
 #endif
 
+#ifdef USE_SENTIO_SD
+#  include <sys/statvfs.h>   // statvfs() — SD free/total space queries
+#endif
+
 // Pull in the full LVGL API so all widget create/class/get symbols are
 // available. sentio.h already includes lvgl.h via the sentio header, but
 // ESPHome may not guarantee that all widget headers are transitively
@@ -31,72 +35,87 @@ static constexpr int16_t SWIPE_THRESHOLD = 30;
 // Static LVGL callbacks (must be free functions — no captures allowed)
 // ---------------------------------------------------------------------------
 
-// Static filesystem driver
+// ---------------------------------------------------------------------------
+// LVGL filesystem drivers — shared POSIX callbacks + per-mount open functions
+//
+// L: → /littlefs  (internal flash, always present)
+// S: → /sdcard    (SD card, only when USE_SENTIO_SD and card is mounted)
+// ---------------------------------------------------------------------------
+
 static lv_fs_drv_t sentio_fs_drv;
 
-static void *sentio_fs_open(lv_fs_drv_t *drv, const char *path, lv_fs_mode_t mode) {
-  const char *mode_str = (mode == LV_FS_MODE_WR) ? "w" : "r";
-  std::string full_path = path;
-  
-  if (full_path.rfind("/littlefs", 0) != 0) {
-    if (full_path.empty() || full_path[0] != '/') {
-      full_path = "/littlefs/" + full_path;
-    } else {
-      full_path = "/littlefs" + full_path;
-    }
-  }
-  
-  FILE *f = fopen(full_path.c_str(), mode_str);
-  return (void *)f;
-}
+#ifdef USE_SENTIO_SD
+lv_fs_drv_t SentioComponent::sentio_sd_fs_drv_;
+#endif
 
-static lv_fs_res_t sentio_fs_close(lv_fs_drv_t *drv, void *file_p) {
-  FILE *f = static_cast<FILE *>(file_p);
-  if (f != nullptr) {
-    fclose(f);
-  }
+// ── Shared POSIX callbacks (identical for both drivers) ───────────────────
+
+static lv_fs_res_t sentio_fs_close_cb(lv_fs_drv_t *, void *fp) {
+  if (fp != nullptr) fclose(static_cast<FILE *>(fp));
   return LV_FS_RES_OK;
 }
 
-static lv_fs_res_t sentio_fs_read(lv_fs_drv_t *drv, void *file_p, void *buf, uint32_t btr, uint32_t *br) {
-  FILE *f = static_cast<FILE *>(file_p);
-  if (f == nullptr) return LV_FS_RES_HW_ERR;
-  size_t read_bytes = fread(buf, 1, btr, f);
-  if (br != nullptr) {
-    *br = read_bytes;
-  }
+static lv_fs_res_t sentio_fs_read_cb(lv_fs_drv_t *, void *fp, void *buf, uint32_t btr, uint32_t *br) {
+  if (fp == nullptr) return LV_FS_RES_HW_ERR;
+  size_t n = fread(buf, 1, btr, static_cast<FILE *>(fp));
+  if (br != nullptr) *br = static_cast<uint32_t>(n);
   return LV_FS_RES_OK;
 }
 
-static lv_fs_res_t sentio_fs_write(lv_fs_drv_t *drv, void *file_p, const void *buf, uint32_t btw, uint32_t *bw) {
-  FILE *f = static_cast<FILE *>(file_p);
-  if (f == nullptr) return LV_FS_RES_HW_ERR;
-  size_t written_bytes = fwrite(buf, 1, btw, f);
-  if (bw != nullptr) {
-    *bw = written_bytes;
-  }
+static lv_fs_res_t sentio_fs_write_cb(lv_fs_drv_t *, void *fp, const void *buf, uint32_t btw, uint32_t *bw) {
+  if (fp == nullptr) return LV_FS_RES_HW_ERR;
+  size_t n = fwrite(buf, 1, btw, static_cast<FILE *>(fp));
+  if (bw != nullptr) *bw = static_cast<uint32_t>(n);
   return LV_FS_RES_OK;
 }
 
-static lv_fs_res_t sentio_fs_seek(lv_fs_drv_t *drv, void *file_p, uint32_t pos, lv_fs_whence_t whence) {
-  FILE *f = static_cast<FILE *>(file_p);
-  if (f == nullptr) return LV_FS_RES_HW_ERR;
+static lv_fs_res_t sentio_fs_seek_cb(lv_fs_drv_t *, void *fp, uint32_t pos, lv_fs_whence_t whence) {
+  if (fp == nullptr) return LV_FS_RES_HW_ERR;
   int w = SEEK_SET;
   if (whence == LV_FS_SEEK_CUR) w = SEEK_CUR;
   else if (whence == LV_FS_SEEK_END) w = SEEK_END;
-  if (fseek(f, pos, w) != 0) return LV_FS_RES_HW_ERR;
+  return fseek(static_cast<FILE *>(fp), pos, w) == 0 ? LV_FS_RES_OK : LV_FS_RES_HW_ERR;
+}
+
+static lv_fs_res_t sentio_fs_tell_cb(lv_fs_drv_t *, void *fp, uint32_t *pos_p) {
+  if (fp == nullptr) return LV_FS_RES_HW_ERR;
+  long pos = ftell(static_cast<FILE *>(fp));
+  if (pos < 0) return LV_FS_RES_HW_ERR;
+  if (pos_p != nullptr) *pos_p = static_cast<uint32_t>(pos);
   return LV_FS_RES_OK;
 }
 
-static lv_fs_res_t sentio_fs_tell(lv_fs_drv_t *drv, void *file_p, uint32_t *pos_p) {
-  FILE *f = static_cast<FILE *>(file_p);
-  if (f == nullptr) return LV_FS_RES_HW_ERR;
-  long pos = ftell(f);
-  if (pos < 0) return LV_FS_RES_HW_ERR;
-  if (pos_p != nullptr) {
-    *pos_p = static_cast<uint32_t>(pos);
-  }
-  return LV_FS_RES_OK;
+// ── Per-mount open functions ───────────────────────────────────────────────
+
+// L: — always routes to /littlefs
+static void *sentio_lfs_open_cb(lv_fs_drv_t *, const char *path, lv_fs_mode_t mode) {
+  const char *ms = (mode == LV_FS_MODE_WR) ? "w" : "r";
+  std::string full = (path[0] == '/') ? "/littlefs" : "/littlefs/";
+  full += path;
+  return static_cast<void *>(fopen(full.c_str(), ms));
+}
+
+#ifdef USE_SENTIO_SD
+// S: — always routes to /sdcard
+static void *sentio_sd_open_cb(lv_fs_drv_t *, const char *path, lv_fs_mode_t mode) {
+  const char *ms = (mode == LV_FS_MODE_WR) ? "w" : "r";
+  std::string full = (path[0] == '/') ? "/sdcard" : "/sdcard/";
+  full += path;
+  return static_cast<void *>(fopen(full.c_str(), ms));
+}
+#endif
+
+// ── Helper used by all POSIX file-path callers in this component ──────────
+//
+// Priority:
+//   1. Explicit /sdcard/…  → SD (even if SD absent — fopen will fail normally)
+//   2. Explicit /littlefs/… → LittleFS
+//   3. Bare path            → SD if mounted, else LittleFS
+static std::string resolve_path(const std::string &path, bool sd_mounted) {
+  if (path.rfind("/sdcard",   0) == 0) return path;
+  if (path.rfind("/littlefs", 0) == 0) return path;
+  std::string bare = (path.empty() || path[0] != '/') ? "/" + path : path;
+  return sd_mounted ? "/sdcard" + bare : "/littlefs" + bare;
 }
 
 // Called for every interactive widget event (click, value change, etc.)
@@ -179,16 +198,33 @@ void SentioComponent::setup() {
   register_service(&SentioComponent::service_set_bg_image,
                    "sentio_set_bg_image", {"widget_id", "path"});
 
-  // Initialize and register LittleFS driver for LVGL
+  // Register LVGL LittleFS driver (L:)
   lv_fs_drv_init(&sentio_fs_drv);
-  sentio_fs_drv.letter = 'L';
-  sentio_fs_drv.open_cb = sentio_fs_open;
-  sentio_fs_drv.close_cb = sentio_fs_close;
-  sentio_fs_drv.read_cb = sentio_fs_read;
-  sentio_fs_drv.write_cb = sentio_fs_write;
-  sentio_fs_drv.seek_cb = sentio_fs_seek;
-  sentio_fs_drv.tell_cb = sentio_fs_tell;
+  sentio_fs_drv.letter   = 'L';
+  sentio_fs_drv.open_cb  = sentio_lfs_open_cb;
+  sentio_fs_drv.close_cb = sentio_fs_close_cb;
+  sentio_fs_drv.read_cb  = sentio_fs_read_cb;
+  sentio_fs_drv.write_cb = sentio_fs_write_cb;
+  sentio_fs_drv.seek_cb  = sentio_fs_seek_cb;
+  sentio_fs_drv.tell_cb  = sentio_fs_tell_cb;
   lv_fs_drv_register(&sentio_fs_drv);
+
+#ifdef USE_SENTIO_SD
+  if (sd_manager_.mount(sd_cfg_)) {
+    lv_fs_drv_init(&sentio_sd_fs_drv_);
+    sentio_sd_fs_drv_.letter   = 'S';
+    sentio_sd_fs_drv_.open_cb  = sentio_sd_open_cb;
+    sentio_sd_fs_drv_.close_cb = sentio_fs_close_cb;
+    sentio_sd_fs_drv_.read_cb  = sentio_fs_read_cb;
+    sentio_sd_fs_drv_.write_cb = sentio_fs_write_cb;
+    sentio_sd_fs_drv_.seek_cb  = sentio_fs_seek_cb;
+    sentio_sd_fs_drv_.tell_cb  = sentio_fs_tell_cb;
+    lv_fs_drv_register(&sentio_sd_fs_drv_);
+    ESP_LOGI(TAG, "LVGL SD driver registered (S:)");
+  } else {
+    ESP_LOGW(TAG, "SD card unavailable — S: driver not registered");
+  }
+#endif
 
   // Burn-in protection timer (fires every 60 seconds)
   if (anti_burn_in_) {
@@ -230,6 +266,19 @@ void SentioComponent::dump_config() {
   if (!startup_layout_.empty()) {
     ESP_LOGCONFIG(TAG, "  Startup layout: %s", startup_layout_.c_str());
   }
+#ifdef USE_SENTIO_SD
+  const char *sd_mode_str = "?";
+  switch (sd_cfg_.mode) {
+    case SdMode::SDMMC_4BIT: sd_mode_str = "SDMMC 4-bit"; break;
+    case SdMode::SDMMC_1BIT: sd_mode_str = "SDMMC 1-bit"; break;
+    case SdMode::SPI:        sd_mode_str = "SPI";         break;
+  }
+  ESP_LOGCONFIG(TAG, "  SD card       : %s, %s",
+                sd_mode_str, sd_manager_.is_mounted() ? "mounted" : "FAILED");
+  if (sd_manager_.is_mounted()) {
+    ESP_LOGCONFIG(TAG, "  SD mount point: %s", sd_manager_.mount_point());
+  }
+#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -393,16 +442,12 @@ void SentioComponent::service_save_layout_line(std::string line, bool append) {
   f.println(line.c_str());
   f.close();
 #else
-  // ESP-IDF path using POSIX FILE API
-  std::string file_path = startup_layout_.empty() ? "/littlefs/sentio.jsonl" : startup_layout_;
-  // Fallback prefix check
-  if (file_path.rfind("/littlefs", 0) != 0) {
-    if (file_path.empty() || file_path[0] != '/') {
-      file_path = "/littlefs/" + file_path;
-    } else {
-      file_path = "/littlefs" + file_path;
-    }
-  }
+  std::string bare = startup_layout_.empty() ? "/sentio.jsonl" : startup_layout_;
+#ifdef USE_SENTIO_SD
+  std::string file_path = resolve_path(bare, sd_manager_.is_mounted());
+#else
+  std::string file_path = resolve_path(bare, false);
+#endif
   const char *mode = append ? "a" : "w";
   FILE *f = fopen(file_path.c_str(), mode);
   if (f == nullptr) {
@@ -810,7 +855,7 @@ void SentioComponent::handle_widget_event(lv_event_t *e, const std::string &widg
 }
 
 // ---------------------------------------------------------------------------
-// LittleFS layout loader
+// Layout loader — resolves path to SD or LittleFS automatically
 // ---------------------------------------------------------------------------
 
 void SentioComponent::load_layout_from_file(const std::string &path) {
@@ -828,48 +873,73 @@ void SentioComponent::load_layout_from_file(const std::string &path) {
   while (f.available()) {
     String raw_line = f.readStringUntil('\n');
     raw_line.trim();
-    if (raw_line.length() > 2) { // Ignore blank or empty-object lines
+    if (raw_line.length() > 2) {
       parse_jsonl_line(raw_line.c_str());
     }
   }
   f.close();
 #else
-  // POSIX file read for ESP-IDF
-  FILE *f = fopen(path.c_str(), "r");
+#ifdef USE_SENTIO_SD
+  std::string resolved = resolve_path(path, sd_manager_.is_mounted());
+#else
+  std::string resolved = resolve_path(path, false);
+#endif
+  FILE *f = fopen(resolved.c_str(), "r");
   if (f == nullptr) {
-    std::string fallback_path = path;
-    if (fallback_path.empty() || fallback_path[0] != '/') {
-      fallback_path = "/" + fallback_path;
-    }
-    fallback_path = "/littlefs" + fallback_path;
-    f = fopen(fallback_path.c_str(), "r");
-    if (f == nullptr) {
-      ESP_LOGW(TAG, "Layout file not found (tried '%s' and '%s')", path.c_str(), fallback_path.c_str());
-      return;
-    }
-    ESP_LOGI(TAG, "Loading layout from %s", fallback_path.c_str());
-  } else {
-    ESP_LOGI(TAG, "Loading layout from %s", path.c_str());
+    ESP_LOGW(TAG, "Layout file not found: %s", resolved.c_str());
+    return;
   }
+  ESP_LOGI(TAG, "Loading layout from %s", resolved.c_str());
 
   char buf[256];
   while (fgets(buf, sizeof(buf), f) != nullptr) {
     std::string raw_line(buf);
-    while (!raw_line.empty() && (raw_line.back() == '\n' || raw_line.back() == '\r')) {
+    // Strip trailing CR/LF
+    while (!raw_line.empty() && (raw_line.back() == '\n' || raw_line.back() == '\r'))
       raw_line.pop_back();
-    }
+    // Trim leading/trailing whitespace
     size_t first = raw_line.find_first_not_of(" \t");
-    size_t last = raw_line.find_last_not_of(" \t");
-    if (first != std::string::npos && last != std::string::npos) {
-      raw_line = raw_line.substr(first, (last - first + 1));
-    } else {
-      raw_line.clear();
-    }
-    if (raw_line.length() > 2) {
+    size_t last  = raw_line.find_last_not_of(" \t");
+    if (first == std::string::npos) { raw_line.clear(); }
+    else                            { raw_line = raw_line.substr(first, last - first + 1); }
+    if (raw_line.length() > 2)
       parse_jsonl_line(raw_line);
-    }
   }
   fclose(f);
+#endif
+}
+
+// ---------------------------------------------------------------------------
+// SD card query helpers — exposed to template sensor / binary_sensor lambdas
+// ---------------------------------------------------------------------------
+
+#ifdef USE_SENTIO_SD
+static bool sd_statvfs_(struct statvfs *out) {
+  return statvfs("/sdcard", out) == 0;
+}
+#endif
+
+float SentioComponent::get_sd_free_mb() const {
+#ifdef USE_SENTIO_SD
+  if (!sd_manager_.is_mounted()) return NAN;
+  struct statvfs st;
+  if (!sd_statvfs_(&st)) return NAN;
+  return static_cast<float>(static_cast<uint64_t>(st.f_bavail) * st.f_frsize)
+         / (1024.0f * 1024.0f);
+#else
+  return NAN;
+#endif
+}
+
+float SentioComponent::get_sd_total_mb() const {
+#ifdef USE_SENTIO_SD
+  if (!sd_manager_.is_mounted()) return NAN;
+  struct statvfs st;
+  if (!sd_statvfs_(&st)) return NAN;
+  return static_cast<float>(static_cast<uint64_t>(st.f_blocks) * st.f_frsize)
+         / (1024.0f * 1024.0f);
+#else
+  return NAN;
 #endif
 }
 
