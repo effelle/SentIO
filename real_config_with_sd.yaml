@@ -231,7 +231,7 @@ sentio:
   id: my_sentio
   touch_source: my_touch
   backlight_light: backlight
-  sleep_timeout: 300s
+  sleep_timeout: 30s
   suppress_wake_click: true
   soft_sleep_only: false
   gesture_threshold: 80    # px min displacement (default 80, tune per screen size)                                

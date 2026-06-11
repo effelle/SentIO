@@ -13,6 +13,7 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome import automation
 from esphome.components import light, output, touchscreen
+from esphome.components.esp32 import add_idf_sdkconfig_option
 from esphome.const import CONF_ID, CONF_TRIGGER_ID
 from esphome.core import CORE
 
@@ -294,20 +295,20 @@ async def to_code(config):
     cg.add(var.set_gesture_timeout(config[CONF_GESTURE_TIMEOUT]))
     cg.add(var.set_long_press_time(config[CONF_LONG_PRESS_TIME]))
 
-    # SD card (ESP-IDF only)
+    # SD card (ESP32 / ESP-IDF only)
     if CONF_SD_CARD in config:
-        if not CORE.using_esp_idf:
+        if not CORE.is_esp32:
             raise cv.Invalid(
-                "sentio sd_card requires 'framework: type: esp-idf'. "
-                "Arduino framework is not supported for SD card access."
+                "sentio sentio_sd requires an ESP32 target with 'framework: type: esp-idf'. "
+                "Other platforms are not supported for SD card access."
             )
         sd = config[CONF_SD_CARD]
         cg.add_define("USE_SENTIO_SD")
         # FatFS Long Filename (LFN) support — required for filenames > 8.3 chars.
-        cg.add_idf_sdkconfig_option("CONFIG_FATFS_LFN_HEAP",     "y")
-        cg.add_idf_sdkconfig_option("CONFIG_FATFS_CODEPAGE_437", "y")
+        add_idf_sdkconfig_option("CONFIG_FATFS_LFN_HEAP",     "y")
+        add_idf_sdkconfig_option("CONFIG_FATFS_CODEPAGE_437", "y")
         # Allow up to 5 simultaneous open file handles (LVGL + services).
-        cg.add_idf_sdkconfig_option("CONFIG_FATFS_FS_LOCK",      "5")
+        add_idf_sdkconfig_option("CONFIG_FATFS_FS_LOCK",      "5")
 
         cg.add(var.set_sd_mode(sd[CONF_SD_MODE]))
         cg.add(var.set_sd_clk_pin(sd[CONF_SD_CLK_PIN]))
