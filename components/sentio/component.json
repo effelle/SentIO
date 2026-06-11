@@ -2,5 +2,19 @@
     "dependencies": [
         "esphome"
     ],
-    "version": "1.0.0"
+    "version": "1.0.0",
+    "esphome": {
+        "platformio_options": {
+            "build_flags": [
+                "-D USE_SENTIO_SD"
+            ]
+        },
+        "components": [
+            "fatfs",
+            "sdmmc",
+            "driver",
+            "spi_flash",
+            "vfs"
+        ]
+    }
 }

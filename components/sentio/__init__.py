@@ -304,6 +304,12 @@ async def to_code(config):
             )
         sd = config[CONF_SD_CARD]
         cg.add_define("USE_SENTIO_SD")
+        # Declare ESP-IDF component dependencies for SD card / FatFS
+        cg.add_library("fatfs", None)
+        cg.add_library("sdmmc", None)
+        cg.add_library("vfs", None)
+        cg.add_library("driver", None)
+        cg.add_library("spi_flash", None)
         # FatFS Long Filename (LFN) support — required for filenames > 8.3 chars.
         add_idf_sdkconfig_option("CONFIG_FATFS_LFN_HEAP",     "y")
         add_idf_sdkconfig_option("CONFIG_FATFS_CODEPAGE_437", "y")
