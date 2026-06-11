@@ -913,6 +913,7 @@ void SentioComponent::load_layout_from_file(const std::string &path) {
 
 #ifdef USE_SENTIO_SD
 extern "C" {
+#include "esp_vfs_fat.h"
 #include "ff.h"
 }
 static bool sd_fatfs_info_(FATFS **fs, DWORD *free_clust, DWORD *total_clust, DWORD *sect_size) {

@@ -312,6 +312,8 @@ async def to_code(config):
         # Require VFS support (disabled by default in ESPHome) for statvfs/fatfs
         require_vfs_dir()
         require_vfs_select()
+        # Include fatfs component for FatFS API (f_getfree, etc.)
+        cg.add_platformio_option("build_flags", ["-D CONFIG_FATFS_LFN_HEAP=y", "-D CONFIG_FATFS_CODEPAGE_437=y", "-D CONFIG_FATFS_FS_LOCK=5"])
         # FatFS Long Filename (LFN) support — required for filenames > 8.3 chars.
         add_idf_sdkconfig_option("CONFIG_FATFS_LFN_HEAP",     "y")
         add_idf_sdkconfig_option("CONFIG_FATFS_CODEPAGE_437", "y")
