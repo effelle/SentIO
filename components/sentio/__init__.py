@@ -81,7 +81,7 @@ CONF_SD_FORMAT_IF_MOUNT_FAILED = "format_if_mount_failed"
 CONF_SD_SPI_HOST               = "spi_host"
 CONF_SD_CS_HARDWIRED           = "cs_hardwired"
 
-SdMode = sentio_ns.enum("SdMode")
+SdMode = sentio_ns.enum("SdMode", is_class=True)
 SD_MODE_OPTIONS = {
     "sdmmc_1bit": SdMode.SDMMC_1BIT,
     "sdmmc_4bit": SdMode.SDMMC_4BIT,
