@@ -9,9 +9,7 @@
 #  include "LittleFS.h"
 #endif
 
-#ifdef USE_SENTIO_SD
-#  include <sys/statvfs.h>   // statvfs() — SD free/total space queries
-#endif
+
 
 // Pull in the full LVGL API so all widget create/class/get symbols are
 // available. sentio.h already includes lvgl.h via the sentio header, but
@@ -914,18 +912,28 @@ void SentioComponent::load_layout_from_file(const std::string &path) {
 // ---------------------------------------------------------------------------
 
 #ifdef USE_SENTIO_SD
-static bool sd_statvfs_(struct statvfs *out) {
-  return statvfs("/sdcard", out) == 0;
+extern "C" {
+#include "ff.h"
+}
+static bool sd_fatfs_info_(FATFS **fs, DWORD *free_clust, DWORD *total_clust, DWORD *sect_size) {
+  FATFS *fs_ptr = nullptr;
+  FRESULT res = f_getfree("/sdcard", free_clust, &fs_ptr);
+  if (res != FR_OK || fs_ptr == nullptr) return false;
+  *total_clust = (fs_ptr->n_fatent - 2);
+  *sect_size = fs_ptr->ssize;
+  *fs = fs_ptr;
+  return true;
 }
 #endif
 
 float SentioComponent::get_sd_free_mb() const {
 #ifdef USE_SENTIO_SD
   if (!sd_manager_.is_mounted()) return NAN;
-  struct statvfs st;
-  if (!sd_statvfs_(&st)) return NAN;
-  return static_cast<float>(static_cast<uint64_t>(st.f_bavail) * st.f_frsize)
-         / (1024.0f * 1024.0f);
+  DWORD free_clust = 0, total_clust = 0, sect_size = 0;
+  FATFS *fs = nullptr;
+  if (!sd_fatfs_info_(&fs, &free_clust, &total_clust, &sect_size)) return NAN;
+  uint64_t free_bytes = (uint64_t)free_clust * sect_size;
+  return static_cast<float>(free_bytes) / (1024.0f * 1024.0f);
 #else
   return NAN;
 #endif
@@ -934,10 +942,11 @@ float SentioComponent::get_sd_free_mb() const {
 float SentioComponent::get_sd_total_mb() const {
 #ifdef USE_SENTIO_SD
   if (!sd_manager_.is_mounted()) return NAN;
-  struct statvfs st;
-  if (!sd_statvfs_(&st)) return NAN;
-  return static_cast<float>(static_cast<uint64_t>(st.f_blocks) * st.f_frsize)
-         / (1024.0f * 1024.0f);
+  DWORD free_clust = 0, total_clust = 0, sect_size = 0;
+  FATFS *fs = nullptr;
+  if (!sd_fatfs_info_(&fs, &free_clust, &total_clust, &sect_size)) return NAN;
+  uint64_t total_bytes = (uint64_t)total_clust * sect_size;
+  return static_cast<float>(total_bytes) / (1024.0f * 1024.0f);
 #else
   return NAN;
 #endif
