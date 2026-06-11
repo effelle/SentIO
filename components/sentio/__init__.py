@@ -19,6 +19,11 @@ from esphome.components.esp32 import (
     require_vfs_select,
 )
 from esphome.core import CORE
+
+# Call VFS requirement hooks at module-import time so they are set before the
+# ESP32 component's to_code() checks them (it runs before ours).
+require_vfs_dir()
+require_vfs_select()
 from esphome.const import CONF_ID, CONF_TRIGGER_ID
 from esphome.core import CORE
 
@@ -309,9 +314,6 @@ async def to_code(config):
             )
         sd = config[CONF_SD_CARD]
         cg.add_define("USE_SENTIO_SD")
-        # Require VFS support (disabled by default in ESPHome) for statvfs/fatfs
-        require_vfs_dir()
-        require_vfs_select()
         # FatFS Long Filename (LFN) support — required for filenames > 8.3 chars.
         add_idf_sdkconfig_option("CONFIG_FATFS_LFN_HEAP",     "y")
         add_idf_sdkconfig_option("CONFIG_FATFS_CODEPAGE_437", "y")
