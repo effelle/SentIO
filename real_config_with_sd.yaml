@@ -239,7 +239,7 @@ sentio:
   long_press_time: 500ms
   anti_burn_in: true
 
-  sd_card:
+  sentio_sd:
     # JC3248W535 continuity-test results:
     #   CLK  = GPIO12   CMD/MOSI = GPIO10   D0/MISO = GPIO13
     #   D3/CS = hardwired to GND on PCB → SPI mode forced permanently

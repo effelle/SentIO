@@ -12,6 +12,10 @@
 
 #include "lvgl.h"
 
+#ifdef USE_SENTIO_SD
+#  include "sentio_sd.h"
+#endif
+
 #ifdef USE_SENSOR
 #include "esphome/components/sensor/sensor.h"
 #endif
@@ -117,6 +121,30 @@ class SentioComponent : public Component, public api::CustomAPIDevice {
   void set_display_off_before_sleep(bool v)           { display_off_before_sleep_ = v; }
   void set_startup_layout(const std::string &path)    { startup_layout_ = path; }
   void set_soft_sleep_only(bool v)                    { soft_sleep_only_ = v; }
+
+#ifdef USE_SENTIO_SD
+  void set_sd_mode(SdMode m)                { sd_cfg_.mode = m; }
+  void set_sd_clk_pin(int8_t p)             { sd_cfg_.clk_pin = p; }
+  void set_sd_cmd_pin(int8_t p)             { sd_cfg_.cmd_pin = p; }
+  void set_sd_data0_pin(int8_t p)           { sd_cfg_.data0_pin = p; }
+  void set_sd_data1_pin(int8_t p)           { sd_cfg_.data1_pin = p; }
+  void set_sd_data2_pin(int8_t p)           { sd_cfg_.data2_pin = p; }
+  void set_sd_data3_pin(int8_t p)           { sd_cfg_.data3_pin = p; }
+  void set_sd_spi_host(int8_t h)            { sd_cfg_.spi_host = h; }
+  void set_sd_cs_hardwired(bool v)          { sd_cfg_.cs_hardwired = v; }
+  void set_sd_format_if_mount_failed(bool v){ sd_cfg_.format_if_mount_failed = v; }
+
+  // Query methods — usable from template sensor / binary_sensor lambdas.
+  bool  is_sd_mounted()  const {
+#ifdef USE_SENTIO_SD
+    return sd_manager_.is_mounted();
+#else
+    return false;
+#endif
+  }
+  float get_sd_free_mb() const;   // returns NAN when card is absent/unmounted
+  float get_sd_total_mb() const;  // returns NAN when card is absent/unmounted
+#endif  // USE_SENTIO_SD
   void set_gesture_threshold(uint16_t px)             { gesture_threshold_px_ = px; }
   void set_gesture_timeout(uint32_t ms)               { gesture_timeout_ms_ = ms; }
   void set_long_press_time(uint32_t ms)               { long_press_time_ms_ = ms; }
@@ -222,6 +250,13 @@ class SentioComponent : public Component, public api::CustomAPIDevice {
   // ── Local sensors ─────────────────────────────────────────────────────────
 #ifdef USE_SENSOR
   std::unordered_map<std::string, sensor::Sensor*> local_sensors_;
+#endif
+
+  // ── SD card ───────────────────────────────────────────────────────────────
+#ifdef USE_SENTIO_SD
+  SdCardConfig  sd_cfg_;
+  SdCardManager sd_manager_;
+  static lv_fs_drv_t sentio_sd_fs_drv_;
 #endif
 
   // ── Callback managers (fire automation triggers) ──────────────────────────

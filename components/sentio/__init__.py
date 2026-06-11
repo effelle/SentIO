@@ -67,7 +67,7 @@ CONF_ON_PAGE_HIDE             = "on_page_hide"
 CONF_PAGE_ID                  = "page_id"
 
 # SD card
-CONF_SD_CARD                  = "sd_card"
+CONF_SD_CARD                  = "sentio_sd"
 CONF_SD_MODE                  = "mode"
 CONF_SD_CLK_PIN               = "clk_pin"
 CONF_SD_CMD_PIN               = "cmd_pin"

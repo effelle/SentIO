@@ -4,9 +4,9 @@ Phase 1: Python configuration schema and C++ code generator.
 
 Registers:
   - Component class SentioComponent
-  - YAML options: touch_source, backlight, sleep, burn-in, etc.
+  - YAML options: touch_source, backlight, sleep, burn-in, sd_card, etc.
   - on_sleep / on_wake automation triggers
-  - Four HA API services: run_jsonl, clear, load_layout, save_layout_line
+  - HA API services: run_jsonl, clear, load_layout, save_layout_line, ...
 """
 
 import esphome.codegen as cg
@@ -14,6 +14,7 @@ import esphome.config_validation as cv
 from esphome import automation
 from esphome.components import light, output, touchscreen
 from esphome.const import CONF_ID, CONF_TRIGGER_ID
+from esphome.core import CORE
 
 CODEOWNERS = ["@effelle"]
 DEPENDENCIES = ["api", "lvgl"]
@@ -64,6 +65,79 @@ CONF_ON_SWIPE_DOWN            = "on_swipe_down"
 CONF_ON_PAGE_SHOW             = "on_page_show"
 CONF_ON_PAGE_HIDE             = "on_page_hide"
 CONF_PAGE_ID                  = "page_id"
+
+# SD card
+CONF_SD_CARD                  = "sentio_sd"
+CONF_SD_MODE                  = "mode"
+CONF_SD_CLK_PIN               = "clk_pin"
+CONF_SD_CMD_PIN               = "cmd_pin"
+CONF_SD_DATA0_PIN             = "data0_pin"
+CONF_SD_DATA1_PIN             = "data1_pin"
+CONF_SD_DATA2_PIN             = "data2_pin"
+CONF_SD_DATA3_PIN             = "data3_pin"
+CONF_SD_FORMAT_IF_MOUNT_FAILED = "format_if_mount_failed"
+CONF_SD_SPI_HOST               = "spi_host"
+CONF_SD_CS_HARDWIRED           = "cs_hardwired"
+
+SdMode = sentio_ns.enum("SdMode")
+SD_MODE_OPTIONS = {
+    "sdmmc_1bit": SdMode.SDMMC_1BIT,
+    "sdmmc_4bit": SdMode.SDMMC_4BIT,
+    "spi":        SdMode.SPI,
+}
+
+
+def _sd_card_schema(value):
+    """Apply the sd_card field schema then enforce cross-field pin rules.
+
+    Keeping validation inside the sub-schema (rather than wrapping CONFIG_SCHEMA
+    in cv.All) lets ESPHome introspect the top-level schema keys correctly and
+    produce accurate 'invalid option' messages for unrelated fields.
+    """
+    value = cv.Schema({
+        cv.Optional(CONF_SD_MODE, default="sdmmc_4bit"):
+            cv.enum(SD_MODE_OPTIONS),
+        cv.Required(CONF_SD_CLK_PIN):   cv.int_range(min=0, max=48),
+        cv.Required(CONF_SD_CMD_PIN):   cv.int_range(min=0, max=48),
+        cv.Required(CONF_SD_DATA0_PIN): cv.int_range(min=0, max=48),
+        cv.Optional(CONF_SD_DATA1_PIN): cv.int_range(min=0, max=48),
+        cv.Optional(CONF_SD_DATA2_PIN): cv.int_range(min=0, max=48),
+        cv.Optional(CONF_SD_DATA3_PIN): cv.int_range(min=0, max=48),
+        # Required when mode: spi. Must be declared explicitly — there is no
+        # safe default because the right host depends on your board wiring:
+        #   spi_host: 1  (SPI2_HOST) — share with a standard single-wire SPI bus
+        #   spi_host: 2  (SPI3_HOST) — separate bus; mandatory on QSPI/quad-SPI boards
+        # Not used for SDMMC modes.
+        cv.Optional(CONF_SD_SPI_HOST): cv.int_range(min=0, max=2),
+        # Set true when D3/CS is hardwired to GND on the PCB (e.g. JC3248W535).
+        # In this case data3_pin is a dummy GPIO — the driver toggles it but the
+        # card ignores it because the hardware CS is permanently asserted.
+        cv.Optional(CONF_SD_CS_HARDWIRED, default=False): cv.boolean,
+        cv.Optional(CONF_SD_FORMAT_IF_MOUNT_FAILED, default=False): cv.boolean,
+    })(value)
+
+    mode = value.get(CONF_SD_MODE, "sdmmc_4bit")
+
+    if mode == "sdmmc_4bit":
+        for pin in (CONF_SD_DATA1_PIN, CONF_SD_DATA2_PIN, CONF_SD_DATA3_PIN):
+            if pin not in value:
+                raise cv.Invalid(f"sd_card mode 'sdmmc_4bit' requires '{pin}'")
+
+    if mode == "spi":
+        if CONF_SD_DATA3_PIN not in value:
+            raise cv.Invalid(
+                "sd_card mode 'spi' uses data3_pin as CS — it must be specified"
+            )
+        if CONF_SD_SPI_HOST not in value:
+            raise cv.Invalid(
+                "sd_card mode 'spi' requires 'spi_host'.\n"
+                "  spi_host: 1  → SPI2_HOST (shared with display on single-SPI boards)\n"
+                "  spi_host: 2  → SPI3_HOST (separate bus; required on QSPI/quad-SPI boards)\n"
+                "Check your board's SPI wiring before choosing."
+            )
+
+    return value
+
 
 # ---------------------------------------------------------------------------
 # Schema
@@ -137,6 +211,12 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_ON_PAGE_HIDE): automation.validate_automation({
         cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(PageHideTrigger),
     }),
+
+    # Optional SD card — ESP-IDF only.
+    # When present, SentIO mounts the card during setup() and registers the
+    # LVGL 'S:' driver.  Bare paths (no /sdcard or /littlefs prefix) resolve
+    # to SD first; LittleFS is used as fallback when SD is absent.
+    cv.Optional(CONF_SD_CARD): _sd_card_schema,
 }).extend(cv.COMPONENT_SCHEMA)
 
 
@@ -213,6 +293,36 @@ async def to_code(config):
     cg.add(var.set_gesture_threshold(config[CONF_GESTURE_THRESHOLD]))
     cg.add(var.set_gesture_timeout(config[CONF_GESTURE_TIMEOUT]))
     cg.add(var.set_long_press_time(config[CONF_LONG_PRESS_TIME]))
+
+    # SD card (ESP-IDF only)
+    if CONF_SD_CARD in config:
+        if not CORE.using_esp_idf:
+            raise cv.Invalid(
+                "sentio sd_card requires 'framework: type: esp-idf'. "
+                "Arduino framework is not supported for SD card access."
+            )
+        sd = config[CONF_SD_CARD]
+        cg.add_define("USE_SENTIO_SD")
+        # FatFS Long Filename (LFN) support — required for filenames > 8.3 chars.
+        cg.add_idf_sdkconfig_option("CONFIG_FATFS_LFN_HEAP",     "y")
+        cg.add_idf_sdkconfig_option("CONFIG_FATFS_CODEPAGE_437", "y")
+        # Allow up to 5 simultaneous open file handles (LVGL + services).
+        cg.add_idf_sdkconfig_option("CONFIG_FATFS_FS_LOCK",      "5")
+
+        cg.add(var.set_sd_mode(sd[CONF_SD_MODE]))
+        cg.add(var.set_sd_clk_pin(sd[CONF_SD_CLK_PIN]))
+        cg.add(var.set_sd_cmd_pin(sd[CONF_SD_CMD_PIN]))
+        cg.add(var.set_sd_data0_pin(sd[CONF_SD_DATA0_PIN]))
+        if CONF_SD_DATA1_PIN in sd:
+            cg.add(var.set_sd_data1_pin(sd[CONF_SD_DATA1_PIN]))
+        if CONF_SD_DATA2_PIN in sd:
+            cg.add(var.set_sd_data2_pin(sd[CONF_SD_DATA2_PIN]))
+        if CONF_SD_DATA3_PIN in sd:
+            cg.add(var.set_sd_data3_pin(sd[CONF_SD_DATA3_PIN]))
+        if CONF_SD_SPI_HOST in sd:
+            cg.add(var.set_sd_spi_host(sd[CONF_SD_SPI_HOST]))
+        cg.add(var.set_sd_cs_hardwired(sd[CONF_SD_CS_HARDWIRED]))
+        cg.add(var.set_sd_format_if_mount_failed(sd[CONF_SD_FORMAT_IF_MOUNT_FAILED]))
 
     # Register all local sensors so they can be bound by string ID at runtime
     from esphome import core
