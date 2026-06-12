@@ -240,24 +240,21 @@ sentio:
   anti_burn_in: true
 
   sentio_sd:
-    # JC3248W535 continuity-test results:
-    #   CLK  = GPIO12   CMD/MOSI = GPIO10   D0/MISO = GPIO13
-    #   D3/CS = hardwired to GND on PCB → SPI mode forced permanently
-    #   D2    = GND (unused in SPI mode)   D1 = unknown / unconnected
+    # JC3248W535 official pinout (verified from board schematic):
+    #   CS    = GPIO10
+    #   MOSI  = GPIO11
+    #   SCLK  = GPIO12
+    #   MISO  = GPIO13
     #
     # SPI3_HOST (host 2) is used — display occupies SPI2_HOST via QSPI.
-    # GPIO10/12/13 are entirely separate from the display bus (21,39,40,47,48).
-    #
-    # cs_hardwired: true tells SentIO that D3 is permanently asserted on the
-    # PCB. data3_pin is a dummy GPIO the IDF SPI driver must have; GPIO11 is
-    # free, not on the silk screen, and not allocated to anything else.
+    # CS is a real GPIO, NOT hardwired.
     mode: spi
     spi_host: 2       # SPI3_HOST — separate from the QSPI display (SPI2_HOST)
     clk_pin:    12
-    cmd_pin:    10    # MOSI
+    cmd_pin:    11    # MOSI
     data0_pin:  13    # MISO
-    data3_pin:  11    # Dummy CS — D3/CS is hardwired to GND on the PCB
-    cs_hardwired: true
+    data3_pin:  10    # CS
+    cs_hardwired: false
     format_if_mount_failed: false
 
 
