@@ -310,7 +310,12 @@ async def to_code(config):
         # the project src/ directory so that PlatformIO's ESP-IDF builder finds
         # it and does NOT overwrite it with the default (no-PRIV_REQUIRES) template.
         cmake_path = CORE.relative_src_path("CMakeLists.txt")
+        # v2 — SdCardManager implementation merged into sentio.cpp (sentio_sd.cpp
+        # deleted). The version comment changes the file content so
+        # write_file_if_changed triggers a write, which updates the mtime and
+        # forces CMake to re-configure (clearing any stale FILE(GLOB_RECURSE) cache).
         cmake_content = (
+            "# SentIO CMakeLists v2\n"
             "FILE(GLOB_RECURSE app_sources ${CMAKE_CURRENT_SOURCE_DIR}/*.*)\n"
             "idf_component_register(SRCS ${app_sources}\n"
             "                       PRIV_REQUIRES fatfs sdmmc driver spi_flash vfs)\n"

@@ -17,6 +17,14 @@
 // included — this explicit include ensures they are.
 #include "lvgl.h"
 
+#ifdef USE_SENTIO_SD
+#include "esp_vfs_fat.h"
+#include "sdmmc_cmd.h"
+#include "driver/sdmmc_host.h"
+#include "driver/sdspi_host.h"
+#include "driver/spi_master.h"
+#endif
+
 namespace esphome {
 namespace sentio {
 
@@ -1287,6 +1295,130 @@ void SentioComponent::handle_indev_read(lv_indev_t *indev, lv_indev_data_t *data
     data->point.y = (this->touch_start_y_ < ver_res / 2) ? ver_res - 1 : 0;
   }
 }
+
+// ---------------------------------------------------------------------------
+// SdCardManager implementation (merged from sentio_sd.cpp to ensure
+// compilation — separate sentio_sd.cpp was not being picked up by CMake)
+// ---------------------------------------------------------------------------
+
+#ifdef USE_SENTIO_SD
+
+static constexpr const char *SD_TAG = "sentio.sd";
+
+bool SdCardManager::mount(const SdCardConfig &cfg) {
+  esp_vfs_fat_sdmmc_mount_config_t mount_cfg = {
+    .format_if_mount_failed = cfg.format_if_mount_failed,
+    .max_files              = 5,
+    .allocation_unit_size   = 16 * 1024,
+  };
+
+  sdmmc_card_t *card = nullptr;
+  esp_err_t ret;
+
+  if (cfg.mode == SdMode::SPI) {
+    ret = static_cast<esp_err_t>(mount_spi_(cfg, &mount_cfg, reinterpret_cast<void **>(&card)));
+  } else {
+    ret = static_cast<esp_err_t>(mount_sdmmc_(cfg, &mount_cfg, reinterpret_cast<void **>(&card)));
+  }
+
+  if (ret != ESP_OK) {
+    ESP_LOGE(SD_TAG, "SD mount failed: %s", esp_err_to_name(ret));
+    return false;
+  }
+
+  card_    = card;
+  mounted_ = true;
+
+  float capacity_mb = (float)card->csd.capacity * 512.0f / (1024.0f * 1024.0f);
+  ESP_LOGI(SD_TAG, "SD mounted at %s (%.0f MB)", MOUNT_POINT, capacity_mb);
+  return true;
+}
+
+void SdCardManager::unmount() {
+  if (!mounted_) return;
+  esp_vfs_fat_sdcard_unmount(MOUNT_POINT, static_cast<sdmmc_card_t *>(card_));
+  mounted_ = false;
+  card_    = nullptr;
+  ESP_LOGI(SD_TAG, "SD unmounted");
+}
+
+int SdCardManager::mount_sdmmc_(const SdCardConfig &cfg, void *mount_cfg_p, void **out_card) {
+  auto *mount_cfg = static_cast<esp_vfs_fat_sdmmc_mount_config_t *>(mount_cfg_p);
+
+  sdmmc_host_t        host = SDMMC_HOST_DEFAULT();
+  sdmmc_slot_config_t slot = SDMMC_SLOT_CONFIG_DEFAULT();
+
+  slot.width  = (cfg.mode == SdMode::SDMMC_1BIT) ? 1 : 4;
+  slot.flags |= SDMMC_SLOT_FLAG_INTERNAL_PULLUP;
+
+#ifdef SOC_SDMMC_USE_GPIO_MATRIX
+  slot.clk = static_cast<gpio_num_t>(cfg.clk_pin);
+  slot.cmd = static_cast<gpio_num_t>(cfg.cmd_pin);
+  slot.d0  = static_cast<gpio_num_t>(cfg.data0_pin);
+  if (cfg.mode == SdMode::SDMMC_4BIT) {
+    slot.d1 = static_cast<gpio_num_t>(cfg.data1_pin);
+    slot.d2 = static_cast<gpio_num_t>(cfg.data2_pin);
+    slot.d3 = static_cast<gpio_num_t>(cfg.data3_pin);
+  }
+  ESP_LOGI(SD_TAG, "SD SDMMC %s: CLK=GPIO%d, CMD=GPIO%d, D0=GPIO%d%s",
+           (cfg.mode == SdMode::SDMMC_4BIT) ? "4-bit" : "1-bit",
+           cfg.clk_pin, cfg.cmd_pin, cfg.data0_pin,
+           (cfg.mode == SdMode::SDMMC_4BIT) ? " (+D1-D3)" : "");
+#else
+  ESP_LOGI(SD_TAG, "SD SDMMC %s: using fixed pins (classic ESP32)",
+           (cfg.mode == SdMode::SDMMC_4BIT) ? "4-bit" : "1-bit");
+#endif
+
+  return static_cast<int>(
+    esp_vfs_fat_sdmmc_mount(MOUNT_POINT, &host, &slot, mount_cfg,
+                            reinterpret_cast<sdmmc_card_t **>(out_card)));
+}
+
+int SdCardManager::mount_spi_(const SdCardConfig &cfg, void *mount_cfg_p, void **out_card) {
+  auto *mount_cfg = static_cast<esp_vfs_fat_sdmmc_mount_config_t *>(mount_cfg_p);
+
+  if (cfg.spi_host < 0) {
+    ESP_LOGE(SD_TAG, "SD SPI mode requires 'spi_host' in YAML "
+                     "(1=SPI2_HOST shared bus, 2=SPI3_HOST separate bus)");
+    return static_cast<int>(ESP_ERR_INVALID_ARG);
+  }
+
+  spi_bus_config_t bus_cfg = {};
+  bus_cfg.mosi_io_num     = cfg.cmd_pin;
+  bus_cfg.miso_io_num     = cfg.data0_pin;
+  bus_cfg.sclk_io_num     = cfg.clk_pin;
+  bus_cfg.quadwp_io_num   = -1;
+  bus_cfg.quadhd_io_num   = -1;
+  bus_cfg.max_transfer_sz = 4096;
+
+  esp_err_t bus_ret = spi_bus_initialize(
+    static_cast<spi_host_device_t>(cfg.spi_host), &bus_cfg, SPI_DMA_CH_AUTO);
+
+  if (bus_ret == ESP_ERR_INVALID_STATE) {
+    ESP_LOGD(SD_TAG, "SPI host %d already initialised", cfg.spi_host);
+  } else if (bus_ret != ESP_OK) {
+    ESP_LOGE(SD_TAG, "SPI bus init failed: %s", esp_err_to_name(bus_ret));
+    return static_cast<int>(bus_ret);
+  }
+
+  sdmmc_host_t          host = SDSPI_HOST_DEFAULT();
+  sdspi_device_config_t dev  = SDSPI_DEVICE_CONFIG_DEFAULT();
+
+  host.slot   = cfg.spi_host;
+  dev.host_id = static_cast<spi_host_device_t>(cfg.spi_host);
+  dev.gpio_cs = static_cast<gpio_num_t>(cfg.data3_pin);
+
+  const bool cs_is_dummy = (cfg.cs_hardwired);
+  ESP_LOGI(SD_TAG, "SD SPI: host=%d, CLK=GPIO%d, MOSI=GPIO%d, MISO=GPIO%d, CS=GPIO%d%s",
+           cfg.spi_host, cfg.clk_pin, cfg.cmd_pin, cfg.data0_pin, cfg.data3_pin,
+           cs_is_dummy ? " (dummy — D3 hardwired to GND on PCB)" : "");
+
+  return static_cast<int>(
+    esp_vfs_fat_sdspi_mount(MOUNT_POINT, &host, &dev, mount_cfg,
+                            reinterpret_cast<sdmmc_card_t **>(out_card)));
+}
+
+#endif  // USE_SENTIO_SD
 
 }  // namespace sentio
 }  // namespace esphome
