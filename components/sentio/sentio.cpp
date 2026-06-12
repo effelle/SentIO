@@ -1427,7 +1427,10 @@ int SdCardManager::mount_spi_(const SdCardConfig &cfg, void *mount_cfg_p, void *
 // types (std::string, bool). These normally live in the ESPHome API
 // component's user_services.cpp and are only compiled when the user sets
 // custom_services: true in their API config. Since SentIO auto-enables
-// custom service support, we provide the symbols here to avoid linker errors.
+// custom service support, we force the necessary defines and include the
+// headers directly so the template symbols are available at link time.
+#define USE_API_USER_DEFINED_ACTIONS
+#include "esphome/components/api/api_pb2.h"
 #include "esphome/components/api/user_services.h"
 namespace esphome::api {
 template<> bool               get_execute_arg_value<bool>(const ExecuteServiceArgument &arg) { return arg.bool_; }
