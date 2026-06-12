@@ -343,6 +343,7 @@ async def to_code(config):
         if "api" in CORE.config:
             cg.add_define("USE_API_USER_DEFINED_ACTIONS")
             cg.add_define("USE_API_CUSTOM_SERVICES")
+            cg.add_define("USE_API_HOMEASSISTANT_SERVICES")
             if not CORE.config["api"].get("custom_services", False):
                 cg.add_define("SENTIO_NEED_API_SYMBOLS")
     except Exception:
