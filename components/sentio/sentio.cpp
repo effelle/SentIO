@@ -2,7 +2,12 @@
 // any includes because sentio.h → custom_api_device.h → user_services.h →
 // api_pb2.h has #ifdef USE_API_USER_DEFINED_ACTIONS guarding ExecuteServiceArgument,
 // ServiceArgType, and the get_execute_arg_value/to_service_arg_type templates.
+// We explicitly pre-include api_pb2.h here so it's processed with the define
+// active; otherwise #pragma once from a previous (undef) include in the chain
+// would skip the guarded sections.
 #define USE_API_USER_DEFINED_ACTIONS
+#include "esphome/components/api/api_pb2.h"
+#include "esphome/components/api/user_services.h"
 
 #include "sentio.h"
 
@@ -1430,11 +1435,10 @@ int SdCardManager::mount_spi_(const SdCardConfig &cfg, void *mount_cfg_p, void *
 
 #ifdef SENTIO_NEED_API_SYMBOLS
 // Explicit template instantiations for custom service argument types.
-// These normally live in user_services.cpp and are only compiled when the
-// user sets custom_services: true in YAML. Since SentIO auto-enables custom
-// service support, we provide the symbols here to avoid linker errors.
-// USE_API_USER_DEFINED_ACTIONS is #define'd at the top of this file, so
-// the template declarations from user_services.h are visible here.
+// These normally live in user_services.cpp, but that file is excluded from
+// the build when custom_services: true is not in YAML. The template
+// declarations are visible because user_services.h is force-included at
+// the top of this file with USE_API_USER_DEFINED_ACTIONS defined.
 namespace esphome::api {
 template<> bool               get_execute_arg_value<bool>(const ExecuteServiceArgument &arg) { return arg.bool_; }
 template<> std::string        get_execute_arg_value<std::string>(const ExecuteServiceArgument &arg) { return arg.string_; }
