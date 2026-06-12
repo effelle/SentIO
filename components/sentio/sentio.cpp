@@ -37,6 +37,22 @@ static const char *const TAG = "sentio";
 // Swipe threshold in pixels before a drag is classified as a swipe
 static constexpr int16_t SWIPE_THRESHOLD = 30;
 
+// When the API build system does NOT compile user_services.cpp (i.e.
+// custom_services: true is absent from the api: config), we must provide
+// the explicit template specializations that user_services.cpp normally
+// supplies.  These are the types used by our register_service() calls
+// (std::string, bool).
+#ifdef SENTIO_NEED_API_SYMBOLS
+namespace esphome {
+namespace api {
+template<> std::string get_execute_arg_value<std::string>(const ExecuteServiceArgument &arg) { return arg.string_; }
+template<> bool        get_execute_arg_value<bool>(const ExecuteServiceArgument &arg)        { return arg.bool_; }
+template<> enums::ServiceArgType to_service_arg_type<std::string>() { return enums::SERVICE_ARG_TYPE_STRING; }
+template<> enums::ServiceArgType to_service_arg_type<bool>()        { return enums::SERVICE_ARG_TYPE_BOOL; }
+}  // namespace api
+}  // namespace esphome
+#endif
+
 // ---------------------------------------------------------------------------
 // Static LVGL callbacks (must be free functions — no captures allowed)
 // ---------------------------------------------------------------------------

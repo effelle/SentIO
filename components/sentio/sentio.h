@@ -5,6 +5,20 @@
 #include "esphome/core/log.h"
 #include "esphome/core/automation.h"
 #include "esphome/components/json/json_util.h"
+// ChimeraFX-style auto-config: define our own API symbols so users don't need
+// homeassistant_services: true / custom_services: true in their YAML config.
+// The #ifndef guards avoid overriding build system defines when those flags ARE set.
+#ifdef USE_API
+#ifndef USE_API_USER_DEFINED_ACTIONS
+#define USE_API_USER_DEFINED_ACTIONS
+#endif
+#ifndef USE_API_CUSTOM_SERVICES
+#define USE_API_CUSTOM_SERVICES
+#endif
+#ifndef USE_API_HOMEASSISTANT_SERVICES
+#define USE_API_HOMEASSISTANT_SERVICES
+#endif
+#endif
 #include "esphome/components/api/custom_api_device.h"
 #include "esphome/components/touchscreen/touchscreen.h"
 #include "esphome/components/light/light_state.h"

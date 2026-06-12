@@ -252,6 +252,22 @@ async def to_code(config):
     #  esphome::sentio::SentioComponent::instance).
     cg.add_global(cg.RawStatement('#include "esphome/components/sentio/sentio.h"'))
 
+    # ChimeraFX-style auto-config: define API build symbols globally so that
+    # register_service() and fire_homeassistant_event() are available to all
+    # translation units even when the user does not set custom_services: true
+    # or homeassistant_services: true in the api: section.
+    cg.add_define("USE_API_HOMEASSISTANT_SERVICES")
+    cg.add_define("USE_API_USER_DEFINED_ACTIONS")
+    cg.add_define("USE_API_CUSTOM_SERVICES")
+
+    # When the API component's own user_services.cpp is NOT compiled (i.e.
+    # custom_services is not true), SentIO must provide the explicit template
+    # specializations for get_execute_arg_value<T> and to_service_arg_type<T>
+    # that user_services.cpp normally supplies.
+    api_config = CORE.config.get("api", {})
+    if not api_config.get("custom_services", False):
+        cg.add_define("SENTIO_NEED_API_SYMBOLS")
+
     # Touch source (optional smart-touch proxy)
     if CONF_TOUCH_SOURCE in config:
         ts = await cg.get_variable(config[CONF_TOUCH_SOURCE])
