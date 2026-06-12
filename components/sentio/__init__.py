@@ -16,6 +16,7 @@ from esphome.components import light, output, touchscreen
 from esphome.components.esp32 import add_idf_sdkconfig_option
 from esphome.const import CONF_ID, CONF_TRIGGER_ID
 from esphome.core import CORE
+from esphome.helpers import write_file_if_changed
 
 CODEOWNERS = ["@effelle"]
 DEPENDENCIES = ["api", "lvgl"]
@@ -304,6 +305,16 @@ async def to_code(config):
             )
         sd = config[CONF_SD_CARD]
         cg.add_define("USE_SENTIO_SD")
+        # The ESP-IDF built-in components (fatfs, sdmmc, driver, spi_flash, vfs)
+        # are excluded from the default ESPHome build. Write a CMakeLists.txt
+        # to declare them as PRIV_REQUIRES so the linker finds their symbols.
+        cmake_path = CORE.relative_src_path("CMakeLists.txt")
+        cmake_content = (
+            "FILE(GLOB_RECURSE app_sources ${CMAKE_CURRENT_SOURCE_DIR}/*.*)\n"
+            "idf_component_register(SRCS ${app_sources}\n"
+            "                       PRIV_REQUIRES fatfs sdmmc driver spi_flash vfs)\n"
+        )
+        write_file_if_changed(cmake_path, cmake_content)
         # FatFS Long Filename (LFN) support — required for filenames > 8.3 chars.
         add_idf_sdkconfig_option("CONFIG_FATFS_LFN_HEAP",     "y")
         add_idf_sdkconfig_option("CONFIG_FATFS_CODEPAGE_437", "y")
