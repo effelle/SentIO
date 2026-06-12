@@ -16,7 +16,6 @@ from esphome.components import light, output, touchscreen
 from esphome.components.esp32 import add_idf_sdkconfig_option
 from esphome.const import CONF_ID, CONF_TRIGGER_ID
 from esphome.core import CORE
-from esphome.helpers import write_file_if_changed
 
 CODEOWNERS = ["@effelle"]
 DEPENDENCIES = ["api", "lvgl"]
@@ -305,22 +304,6 @@ async def to_code(config):
             )
         sd = config[CONF_SD_CARD]
         cg.add_define("USE_SENTIO_SD")
-        # ESP-IDF built-in components (fatfs, sdmmc, driver, spi_flash, vfs) are
-        # excluded from the default ESPHome build.  We write a CMakeLists.txt to
-        # the project src/ directory so that PlatformIO's ESP-IDF builder finds
-        # it and does NOT overwrite it with the default (no-PRIV_REQUIRES) template.
-        cmake_path = CORE.relative_src_path("CMakeLists.txt")
-        # v2 — SdCardManager implementation merged into sentio.cpp (sentio_sd.cpp
-        # deleted). The version comment changes the file content so
-        # write_file_if_changed triggers a write, which updates the mtime and
-        # forces CMake to re-configure (clearing any stale FILE(GLOB_RECURSE) cache).
-        cmake_content = (
-            "# SentIO CMakeLists v2\n"
-            "FILE(GLOB_RECURSE app_sources ${CMAKE_CURRENT_SOURCE_DIR}/*.*)\n"
-            "idf_component_register(SRCS ${app_sources}\n"
-            "                       PRIV_REQUIRES fatfs sdmmc driver spi_flash vfs)\n"
-        )
-        write_file_if_changed(cmake_path, cmake_content)
         # FatFS Long Filename (LFN) support — required for filenames > 8.3 chars.
         add_idf_sdkconfig_option("CONFIG_FATFS_LFN_HEAP",     "y")
         add_idf_sdkconfig_option("CONFIG_FATFS_CODEPAGE_437", "y")
@@ -341,6 +324,18 @@ async def to_code(config):
             cg.add(var.set_sd_spi_host(sd[CONF_SD_SPI_HOST]))
         cg.add(var.set_sd_cs_hardwired(sd[CONF_SD_CS_HARDWIRED]))
         cg.add(var.set_sd_format_if_mount_failed(sd[CONF_SD_FORMAT_IF_MOUNT_FAILED]))
+
+    # Auto-enable Home Assistant API service support.
+    # Unlocks CustomAPIDevice::register_service() for std::string args
+    # without requiring the user to add custom_services: true in YAML.
+    try:
+        if "api" in CORE.config:
+            cg.add_define("USE_API_USER_DEFINED_ACTIONS")
+            cg.add_define("USE_API_CUSTOM_SERVICES")
+            if not CORE.config["api"].get("custom_services", False):
+                cg.add_define("SENTIO_NEED_API_SYMBOLS")
+    except Exception:
+        pass
 
     # Register all local sensors so they can be bound by string ID at runtime
     from esphome import core

@@ -12,7 +12,7 @@
 
 #include "lvgl.h"
 
-#include "sentio_sd.h"
+#include <cstdint>
 
 #ifdef USE_SENSOR
 #include "esphome/components/sensor/sensor.h"
@@ -24,6 +24,38 @@
 
 namespace esphome {
 namespace sentio {
+
+enum class SdMode : uint8_t {
+  SDMMC_1BIT,
+  SDMMC_4BIT,
+  SPI,
+};
+
+struct SdCardConfig {
+  SdMode mode{SdMode::SDMMC_4BIT};
+  int8_t clk_pin{-1};
+  int8_t cmd_pin{-1};
+  int8_t data0_pin{-1};
+  int8_t data1_pin{-1};
+  int8_t data2_pin{-1};
+  int8_t data3_pin{-1};
+  int8_t spi_host{-1};
+  bool   cs_hardwired{false};
+  bool   format_if_mount_failed{false};
+};
+
+class SdCardManager {
+ public:
+  bool        mount(const SdCardConfig &cfg);
+  void        unmount();
+  bool        is_mounted()   const { return mounted_; }
+  const char *mount_point()  const { return "/sdcard"; }
+ private:
+  bool  mounted_{false};
+  void *card_{nullptr};
+  int mount_sdmmc_(const SdCardConfig &cfg, void *mount_cfg_p, void **out_card);
+  int mount_spi_(const SdCardConfig &cfg, void *mount_cfg_p, void **out_card);
+};
 
 // ---------------------------------------------------------------------------
 // Touch-state machine (used when a touch_source is configured)
