@@ -922,12 +922,13 @@ void SentioComponent::load_layout_from_file(const std::string &path) {
 #ifdef USE_SENTIO_SD
 #include "esp_vfs_fat.h"
 #include "ff.h"
-static bool sd_fatfs_info_(FATFS **fs, DWORD *free_clust, DWORD *total_clust, DWORD *sect_size) {
+static bool sd_fatfs_info_(FATFS **fs, DWORD *free_clust, DWORD *total_clust, DWORD *sect_size, DWORD *sectors_per_clust) {
   FATFS *fs_ptr = nullptr;
   FRESULT res = f_getfree("/sdcard", free_clust, &fs_ptr);
   if (res != FR_OK || fs_ptr == nullptr) return false;
   *total_clust = (fs_ptr->n_fatent - 2);
   *sect_size = fs_ptr->ssize;
+  *sectors_per_clust = fs_ptr->csize;
   *fs = fs_ptr;
   return true;
 }
@@ -936,10 +937,10 @@ static bool sd_fatfs_info_(FATFS **fs, DWORD *free_clust, DWORD *total_clust, DW
 float SentioComponent::get_sd_free_mb() const {
 #ifdef USE_SENTIO_SD
   if (!sd_manager_.is_mounted()) return NAN;
-  DWORD free_clust = 0, total_clust = 0, sect_size = 0;
+  DWORD free_clust = 0, total_clust = 0, sect_size = 0, spc = 0;
   FATFS *fs = nullptr;
-  if (!sd_fatfs_info_(&fs, &free_clust, &total_clust, &sect_size)) return NAN;
-  uint64_t free_bytes = (uint64_t)free_clust * sect_size;
+  if (!sd_fatfs_info_(&fs, &free_clust, &total_clust, &sect_size, &spc)) return NAN;
+  uint64_t free_bytes = (uint64_t)free_clust * spc * sect_size;
   return static_cast<float>(free_bytes) / (1024.0f * 1024.0f);
 #else
   return NAN;
@@ -949,10 +950,10 @@ float SentioComponent::get_sd_free_mb() const {
 float SentioComponent::get_sd_total_mb() const {
 #ifdef USE_SENTIO_SD
   if (!sd_manager_.is_mounted()) return NAN;
-  DWORD free_clust = 0, total_clust = 0, sect_size = 0;
+  DWORD free_clust = 0, total_clust = 0, sect_size = 0, spc = 0;
   FATFS *fs = nullptr;
-  if (!sd_fatfs_info_(&fs, &free_clust, &total_clust, &sect_size)) return NAN;
-  uint64_t total_bytes = (uint64_t)total_clust * sect_size;
+  if (!sd_fatfs_info_(&fs, &free_clust, &total_clust, &sect_size, &spc)) return NAN;
+  uint64_t total_bytes = (uint64_t)total_clust * spc * sect_size;
   return static_cast<float>(total_bytes) / (1024.0f * 1024.0f);
 #else
   return NAN;
