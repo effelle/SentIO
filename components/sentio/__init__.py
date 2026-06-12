@@ -336,19 +336,6 @@ async def to_code(config):
         cg.add(var.set_sd_cs_hardwired(sd[CONF_SD_CS_HARDWIRED]))
         cg.add(var.set_sd_format_if_mount_failed(sd[CONF_SD_FORMAT_IF_MOUNT_FAILED]))
 
-    # Auto-enable Home Assistant API service support.
-    # Unlocks CustomAPIDevice::register_service() for std::string args
-    # without requiring the user to add custom_services: true in YAML.
-    try:
-        if "api" in CORE.config:
-            cg.add_define("USE_API_USER_DEFINED_ACTIONS")
-            cg.add_define("USE_API_CUSTOM_SERVICES")
-            cg.add_define("USE_API_HOMEASSISTANT_SERVICES")
-            if not CORE.config["api"].get("custom_services", False):
-                cg.add_define("SENTIO_NEED_API_SYMBOLS")
-    except Exception:
-        pass
-
     # Register all local sensors so they can be bound by string ID at runtime
     from esphome import core
     if "sensor" in core.CORE.config:

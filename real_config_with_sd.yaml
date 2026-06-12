@@ -36,6 +36,8 @@ logger:
 api:
   encryption:
     key: "JqYU9bk4PFLohXWSlBHBQPIFaIh4pPBwuw+8OCAF+Ms="
+  homeassistant_services: true
+  custom_services: true
 
 ota:
   - platform: esphome
