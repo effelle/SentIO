@@ -1304,6 +1304,7 @@ void SentioComponent::handle_indev_read(lv_indev_t *indev, lv_indev_data_t *data
 #ifdef USE_SENTIO_SD
 
 static constexpr const char *SD_TAG = "sentio.sd";
+static constexpr const char *MOUNT_POINT = "/sdcard";
 
 bool SdCardManager::mount(const SdCardConfig &cfg) {
   esp_vfs_fat_sdmmc_mount_config_t mount_cfg = {
